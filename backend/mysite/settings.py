@@ -33,6 +33,8 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     "users",
     "corsheaders",
+    "rest_framework",            # <--- Add this
+    "rest_framework_simplejwt",
     "polls.apps.PollsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -133,3 +135,10 @@ CORS_ALLOWED_ORIGINS = [
 
 # Use our custom user model
 AUTH_USER_MODEL = 'users.User'
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
