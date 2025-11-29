@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "users",
     "corsheaders",
     "polls.apps.PollsConfig",
     "django.contrib.admin",
@@ -129,3 +130,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# Use our custom user model
+AUTH_USER_MODEL = 'users.User'
