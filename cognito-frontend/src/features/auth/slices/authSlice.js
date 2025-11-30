@@ -1,32 +1,57 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { loginUser } from '../api/authApi';
 
-// 1. Initial State: What the memory looks like when the app starts
+// 1. The Async Action (The "Thunk")
+// This is the missing export!
+export const login = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
+  try {
+    const data = await loginUser(credentials);
+    // Save to localStorage so they stay logged in on refresh
+    localStorage.setItem('token', data.access); 
+    return data;
+  } catch (error) {
+    // If login fails, return the error message from Django
+    return rejectWithValue(error.response?.data?.detail || 'Login failed');
+  }
+});
+
 const initialState = {
   isAuthenticated: false,
-  user: null,
-  accessToken: null, // JWT Token for API requests
+  user: null, 
+  token: localStorage.getItem('token') || null, // Load from storage on startup
+  loading: false,
+  error: null,
 };
 
-// 2. The Slice: Grouping the logic
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    // Action: When login succeeds, save the user data
-    loginSuccess: (state, action) => {
-      state.isAuthenticated = true;
-      state.user = action.payload.user;
-      state.accessToken = action.payload.token;
-    },
-    // Action: When logout happens, wipe the data
     logout: (state) => {
+      localStorage.removeItem('token');
       state.isAuthenticated = false;
+      state.token = null;
       state.user = null;
-      state.accessToken = null;
     },
+  },
+  // This handles the Thunk (Loading -> Success -> Failure)
+  extraReducers: (builder) => {
+    builder
+      .addCase(login.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(login.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.token = action.payload.access;
+      })
+      .addCase(login.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
-// 3. Export Actions (buttons) and Reducer (logic)
-export const { loginSuccess, logout } = authSlice.actions;
+export const { logout } = authSlice.actions;
 export default authSlice.reducer;
