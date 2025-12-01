@@ -6,3 +6,9 @@ export const loginUser = async (credentials) => {
   const response = await client.post('api/token/', credentials);
   return response.data; // Returns { access: "...", refresh: "..." }
 };
+
+export const registerUser = async (userData) => {
+  // userData = { username, password, email, role }
+  const response = await client.post('api/register/', userData);
+  return response.data;
+};

@@ -11,15 +11,12 @@ const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   
-  // Read state from the Brain
   const { loading, error } = useSelector((state) => state.auth);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Dispatch the Thunk
     const result = await dispatch(login({ username, password }));
     
-    // If login succeeded, go to Dashboard
     if (login.fulfilled.match(result)) {
       navigate('/dashboard');
     }
@@ -32,7 +29,7 @@ const LoginPage = () => {
         
         {error && (
           <div className="p-3 mb-4 text-sm text-red-600 bg-red-100 rounded">
-            {error}
+            {typeof error === 'string' ? error : 'Login failed'}
           </div>
         )}
 
@@ -59,10 +56,19 @@ const LoginPage = () => {
             />
           </div>
 
-          <Button variant="primary" className="w-full" disabled={loading}>
+          <Button 
+            variant="primary" 
+            className="w-full" 
+            disabled={loading}
+            type="submit" 
+          >
             {loading ? 'Logging in...' : 'Sign In'}
           </Button>
         </form>
+        
+        <p className="mt-4 text-center text-sm">
+            Don't have an account? <a href="/register" className="text-blue-600 hover:underline">Register</a>
+        </p>
       </div>
     </div>
   );

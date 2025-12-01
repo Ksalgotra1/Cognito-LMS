@@ -1,10 +1,9 @@
 import React from 'react';
 
-const Button = ({ children, onClick, variant = "primary" }) => {
-  // Common styles for all buttons
-  const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all duration-200 shadow-sm";
+// Added 'type' prop (defaults to 'button')
+const Button = ({ children, onClick, variant = "primary", className = "", type = "button", disabled = false }) => {
+  const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed";
   
-  // Specific styles for variants
   const variants = {
     primary: "bg-blue-600 text-white hover:bg-blue-700",
     secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300",
@@ -13,8 +12,10 @@ const Button = ({ children, onClick, variant = "primary" }) => {
 
   return (
     <button 
-      className={`${baseStyle} ${variants[variant]}`} 
+      type={type} 
+      className={`${baseStyle} ${variants[variant]} ${className}`} 
       onClick={onClick}
+      disabled={disabled}
     >
       {children}
     </button>

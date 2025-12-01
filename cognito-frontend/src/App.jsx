@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './features/auth/components/LoginPage';
 import Dashboard from './features/courses/components/Dashboard';
 import ProtectedRoute from './features/auth/components/ProtectedRoute'; 
+import SignupPage from './features/auth/components/SignupPage';
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <Routes>
         {/* Public Routes (Anyone can see) */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<SignupPage />} />
         
         {/* Redirect root to dashboard (The Gatekeeper will handle the rest) */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
