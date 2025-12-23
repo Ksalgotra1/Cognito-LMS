@@ -3,6 +3,7 @@ import LoginPage from './features/auth/components/LoginPage';
 import Dashboard from './features/courses/components/Dashboard';
 import ProtectedRoute from './features/auth/components/ProtectedRoute'; 
 import SignupPage from './features/auth/components/SignupPage';
+import CourseDetail from './features/courses/components/CourseDetail';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
            {/* All routes inside here require login */}
            <Route path="/dashboard" element={<Dashboard />} />
            {/* Future: <Route path="/courses" ... /> */}
+           <Route path="/courses/:id" element={<CourseDetail />} />
            {/* Future: <Route path="/profile" ... /> */}
         </Route>
 
