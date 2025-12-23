@@ -38,6 +38,7 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     "users",
+    "courses",
     "corsheaders",
     "rest_framework",            # <--- Add this
     "rest_framework_simplejwt",
