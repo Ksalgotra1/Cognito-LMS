@@ -8,7 +8,7 @@ from users.views import RegisterView
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('polls/', include('polls.urls')), # Your old polls app
-    
+    path('api/courses/', include('courses.urls')),
     # The JWT Key Counter
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
