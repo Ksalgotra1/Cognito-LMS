@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import axios from 'axios';
 import { fetchCourses, fetchCourseById } from '../api/coursesApi';
 
 // Thunk 1: Get All Courses
@@ -19,16 +20,40 @@ export const getCourse = createAsyncThunk('courses/getOne', async (id, { rejectW
   }
 });
 
+// Thunk 3: Toggle Lesson Completion
+export const toggleLessonCompletion = createAsyncThunk(
+  'courses/toggleCompletion',
+  async (lessonId, { getState, rejectWithValue }) => {
+    try {
+      const { auth } = getState();
+      const config = {
+        headers: {
+          Authorization: `Bearer ${auth.token}`, // Secure JWT Header
+        },
+      };
+
+      const response = await axios.post(
+        `http://localhost:8000/api/courses/lessons/${lessonId}/complete/`,
+        {}, 
+        config
+      );
+      return response.data;
+    } catch (error) {
+      // Standard error handling
+      return rejectWithValue(error.response?.data || { detail: "Action failed" });
+    }
+  }
+);
+
 const coursesSlice = createSlice({
   name: 'courses',
   initialState: {
-    list: [],           // Where we store all courses
-    currentCourse: null, // Stores the single course we are viewing
-    loading: false,      // Are we waiting for the server?
-    error: null,         // Did something break?
+    list: [],           
+    currentCourse: null, 
+    loading: false,      
+    error: null,         
   },
   reducers: {
-    // Optional: Call this when leaving the course detail page to clear data
     clearCurrentCourse: (state) => {
       state.currentCourse = null;
     }
@@ -53,7 +78,7 @@ const coursesSlice = createSlice({
       .addCase(getCourse.pending, (state) => {
         state.loading = true;
         state.error = null;
-        state.currentCourse = null; // Clear old data while fetching new
+        state.currentCourse = null;
       })
       .addCase(getCourse.fulfilled, (state, action) => {
         state.loading = false;
@@ -62,6 +87,19 @@ const coursesSlice = createSlice({
       .addCase(getCourse.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // --- Handle toggleLessonCompletion ---
+      .addCase(toggleLessonCompletion.fulfilled, (state, action) => {
+        if (state.currentCourse) {
+          // Optimistic UI Update
+          state.currentCourse.modules.forEach((module) => {
+            const lesson = module.lessons.find((l) => l.id === action.payload.lesson_id);
+            if (lesson) {
+              lesson.is_completed = action.payload.is_completed;
+            }
+          });
+        }
       });
   },
 });
