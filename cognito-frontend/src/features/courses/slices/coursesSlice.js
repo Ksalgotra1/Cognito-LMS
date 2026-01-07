@@ -1,20 +1,32 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { fetchCourses, fetchCourseById } from '../api/coursesApi';
+import client from '../../../lib/axios'; // <--- Using your existing client
 
 // Thunk 1: Get All Courses
-export const getCourses = createAsyncThunk('courses/getAll', async (_, { rejectWithValue }) => {
+export const getCourses = createAsyncThunk('courses/getAll', async (_, { getState, rejectWithValue }) => {
   try {
-    return await fetchCourses();
+    const { auth } = getState();
+    const config = {
+      headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {},
+    };
+    
+    // URL includes 'api/' because your baseURL is just localhost:8000
+    const response = await client.get('api/courses/', config);
+    return response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Failed to load courses');
   }
 });
 
 // Thunk 2: Get Single Course
-export const getCourse = createAsyncThunk('courses/getOne', async (id, { rejectWithValue }) => {
+export const getCourse = createAsyncThunk('courses/getOne', async (id, { getState, rejectWithValue }) => {
   try {
-    return await fetchCourseById(id);
+    const { auth } = getState();
+    const config = {
+      headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {},
+    };
+
+    const response = await client.get(`api/courses/${id}/`, config);
+    return response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data || 'Failed to load course');
   }
@@ -28,18 +40,17 @@ export const toggleLessonCompletion = createAsyncThunk(
       const { auth } = getState();
       const config = {
         headers: {
-          Authorization: `Bearer ${auth.token}`, // Secure JWT Header
+          Authorization: `Bearer ${auth.token}`, 
         },
       };
 
-      const response = await axios.post(
-        `http://localhost:8000/api/courses/lessons/${lessonId}/complete/`,
+      const response = await client.post(
+        `api/courses/lessons/${lessonId}/complete/`,
         {}, 
         config
       );
       return response.data;
     } catch (error) {
-      // Standard error handling
       return rejectWithValue(error.response?.data || { detail: "Action failed" });
     }
   }
@@ -92,7 +103,6 @@ const coursesSlice = createSlice({
       // --- Handle toggleLessonCompletion ---
       .addCase(toggleLessonCompletion.fulfilled, (state, action) => {
         if (state.currentCourse) {
-          // Optimistic UI Update
           state.currentCourse.modules.forEach((module) => {
             const lesson = module.lessons.find((l) => l.id === action.payload.lesson_id);
             if (lesson) {

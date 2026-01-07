@@ -1,16 +1,15 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getCourses } from '../slices/coursesSlice'; // Ensure this path matches where you put the slice
-import { Link } from 'react-router-dom';
+import { getCourses } from '../slices/coursesSlice';
+
+import CourseCard from './CourseCard'; 
 
 const Dashboard = () => {
   const dispatch = useDispatch();
   
-  // Get User and Course state
   const { user } = useSelector((state) => state.auth);
   const { list: courses, loading, error } = useSelector((state) => state.courses);
 
-  // Fetch courses when the Dashboard mounts
   useEffect(() => {
     dispatch(getCourses());
   }, [dispatch]);
@@ -34,47 +33,18 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* 3. Empty State (No courses found) */}
+      {/* 3. Empty State */}
       {!loading && courses.length === 0 && (
         <div className="text-center py-10 bg-white rounded shadow">
             <h3 className="text-xl text-gray-500">No courses available yet.</h3>
         </div>
       )}
 
-      {/* 4. Course Grid (The Map Loop) */}
+      {/* 4. NEW CLEAN GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {courses.map((course) => (
-          <div key={course.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-            
-            {/* Course Thumbnail / Initial */}
-            <div className="h-40 bg-indigo-600 flex items-center justify-center">
-                <span className="text-white text-4xl font-bold">
-                  {course.title ? course.title[0] : 'C'}
-                </span>
-            </div>
-            
-            {/* Course Details */}
-            <div className="p-6">
-              <h3 className="text-xl font-bold mb-2">{course.title}</h3>
-              <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                {course.description}
-              </p>
-              
-              <div className="flex justify-between items-center mt-4">
-                <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">
-                    Instr: {course.instructor_name || 'Admin'}
-                </span>
-                
-                {/* Changed Button to Link for navigation */}
-                <Link 
-                  to={`/courses/${course.id}`} 
-                  className="text-indigo-600 font-semibold hover:text-indigo-800"
-                >
-                    View Course →
-                </Link>
-              </div>
-            </div>
-          </div>
+          // We pass the entire course object to the card
+          <CourseCard key={course.id} course={course} />
         ))}
       </div>
     </div>
