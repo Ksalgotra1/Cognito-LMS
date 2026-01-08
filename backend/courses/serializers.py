@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Course, Module, Lesson, UserProgress  
+from .models import Course, Module, Lesson, UserProgress, Question, Choice  
+
 
 class LessonSerializer(serializers.ModelSerializer):
     is_completed = serializers.SerializerMethodField() 
@@ -52,3 +53,17 @@ class CourseSerializer(serializers.ModelSerializer):
         
         # 3. Calculate Percentage
         return round((completed_lessons / total_lessons) * 100)
+    
+class ChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Choice
+        # 🚨 SECURITY ALERT: We DO NOT include 'is_correct' here.
+        # If we did, students could see the answers in the JSON!
+        fields = ['id', 'text']
+
+class QuestionSerializer(serializers.ModelSerializer):
+    choices = ChoiceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Question
+        fields = ['id', 'text', 'choices']
