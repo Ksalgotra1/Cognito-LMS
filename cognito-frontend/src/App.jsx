@@ -4,6 +4,7 @@ import Dashboard from './features/courses/components/Dashboard';
 import ProtectedRoute from './features/auth/components/ProtectedRoute'; 
 import SignupPage from './features/auth/components/SignupPage';
 import CourseDetail from './features/courses/components/CourseDetail';
+import Quiz from './features/courses/components/Quiz';
 
 function App() {
   return (
@@ -13,16 +14,17 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<SignupPage />} />
         
-        {/* Redirect root to dashboard (The Gatekeeper will handle the rest) */}
+        {/* Redirect root to dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         {/* 🔒 Protected Routes (Must have Token) */}
         <Route element={<ProtectedRoute />}>
-           {/* All routes inside here require login */}
            <Route path="/dashboard" element={<Dashboard />} />
-           {/* Future: <Route path="/courses" ... /> */}
            <Route path="/courses/:id" element={<CourseDetail />} />
-           {/* Future: <Route path="/profile" ... /> */}
+           
+           {/* QUIZ ROUTE HERE */}
+           <Route path="/courses/lessons/:lessonId/quiz" element={<Quiz />} />
+           
         </Route>
 
       </Routes>

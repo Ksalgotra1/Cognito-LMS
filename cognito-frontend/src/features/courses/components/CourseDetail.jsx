@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom'; // <--- Added useNavigate
 import { useDispatch, useSelector } from 'react-redux';
 import { getCourse, toggleLessonCompletion } from '../slices/coursesSlice';
 
 const CourseDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate(); // <--- Initialize Hook
   const dispatch = useDispatch();
   
   const { currentCourse: course, loading, error } = useSelector((state) => state.courses);
@@ -119,23 +120,33 @@ const CourseDetail = () => {
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <h1 className="text-2xl font-bold">{activeLesson.title}</h1>
               
-              <button
-                onClick={handleToggleComplete}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all shadow-sm flex items-center gap-2
-                  ${isLessonCompleted(activeLesson.id)
-                    ? "bg-green-100 text-green-700 border border-green-200 cursor-default"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md"
-                  }`}
-              >
-                {isLessonCompleted(activeLesson.id) ? (
-                  <>
-                    <span>Completed</span>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                  </>
-                ) : (
-                  "Mark as Complete"
-                )}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleToggleComplete}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all shadow-sm flex items-center gap-2
+                    ${isLessonCompleted(activeLesson.id)
+                      ? "bg-green-100 text-green-700 border border-green-200 cursor-default"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md"
+                    }`}
+                >
+                  {isLessonCompleted(activeLesson.id) ? (
+                    <>
+                      <span>Completed</span>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                    </>
+                  ) : (
+                    "Mark as Complete"
+                  )}
+                </button>
+
+                {/* NEW: Take Quiz Button */}
+                <button
+                  onClick={() => navigate(`/courses/lessons/${activeLesson.id}/quiz`)}
+                  className="px-4 py-2 rounded-lg font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-sm flex items-center gap-2"
+                >
+                  <span>📝 Take Quiz</span>
+                </button>
+              </div>
             </div>
             
             <div className="prose bg-white p-6 rounded shadow max-w-none">
