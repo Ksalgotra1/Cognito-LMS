@@ -4,7 +4,8 @@ from .views import (
     CourseDetailView, 
     toggle_lesson_completion, 
     get_quiz,      
-    submit_quiz    
+    submit_quiz,
+    generate_certificate    
 )
 
 urlpatterns = [
@@ -20,4 +21,8 @@ urlpatterns = [
     path('lessons/<int:lesson_id>/quiz/', get_quiz, name='get-quiz'),
     # POST: Submit answers for grading
     path('lessons/<int:lesson_id>/quiz/submit/', submit_quiz, name='submit-quiz'),
+
+    # --- Certificate Route ---
+    # This generates the PDF for a specific course
+    path('<int:course_id>/certificate/', generate_certificate, name='get-certificate'),
 ]

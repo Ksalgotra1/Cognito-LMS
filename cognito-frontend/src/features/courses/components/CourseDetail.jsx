@@ -139,7 +139,7 @@ const CourseDetail = () => {
                   )}
                 </button>
 
-                {/* NEW: Take Quiz Button */}
+                {/* Take Quiz Button */}
                 <button
                   onClick={() => navigate(`/courses/lessons/${activeLesson.id}/quiz`)}
                   className="px-4 py-2 rounded-lg font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-sm flex items-center gap-2"

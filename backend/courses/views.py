@@ -1,14 +1,21 @@
+import io
+from datetime import date
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.http import FileResponse
 
-# Import all your models and serializers
+# --- REPORTLAB IMPORTS (For PDF Generation) ---
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+
+# Import models and serializers
 from .models import Course, Lesson, UserProgress, Question, Choice
 from .serializers import CourseSerializer, QuestionSerializer
 
-# --- Existing Course Views ---
+# --- Course Views ---
 class CourseListCreateView(generics.ListCreateAPIView):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
@@ -65,7 +72,7 @@ def submit_quiz(request, lesson_id):
     
     total_questions = questions.count()
     correct_count = 0
-    user_answers = request.data # Dictionary from Frontend
+    user_answers = request.data 
     
     # Grading Loop
     for question in questions:
@@ -96,5 +103,92 @@ def submit_quiz(request, lesson_id):
         "total": total_questions,
         "correct": correct_count,
         "score": round(score, 2),
-        "passed": score >= 70 # Pass if 70% or higher
+        "passed": score >= 70 
     })
+
+# ---  Certificate Generator ---
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def generate_certificate(request, course_id):
+    """
+    Generates a PDF certificate ONLY if the user has completed all lessons.
+    """
+    course = get_object_or_404(Course, id=course_id)
+    
+    # --- 🔒 SECURITY GATEKEEPER ---
+    
+    # 1. Count TOTAL lessons in this course
+    # (We trace the relationship: Lesson -> Module -> Course)
+    total_lessons = Lesson.objects.filter(module__course=course).count()
+    
+    # 2. Count COMPLETED lessons for this user
+    # (We trace: UserProgress -> Lesson -> Module -> Course)
+    completed_lessons = UserProgress.objects.filter(
+        user=request.user,             # The logged-in student
+        lesson__module__course=course, # Only lessons in THIS course
+        is_completed=True              # Only ones marked "True"
+    ).count()
+
+    # 3. The Check
+    # If completed is less than total, BLOCK the download.
+    if completed_lessons < total_lessons:
+        return Response(
+            {
+                "detail": "Course incomplete.",
+                "completed": completed_lessons,
+                "total": total_lessons,
+                "message": f"You have completed {completed_lessons}/{total_lessons} lessons. Finish all lessons to unlock your certificate."
+            }, 
+            status=403 # 403 Forbidden
+        )
+        
+    # --- 🏆 PDF GENERATION ---
+    # If code reaches here, the user has passed the check.
+
+    # 1. Create a memory buffer for the PDF
+    buffer = io.BytesIO()
+
+    # 2. Create the PDF Canvas
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter # Standard US Letter size
+
+    # --- DRAWING THE CERTIFICATE ---
+    
+    # Title
+    p.setFont("Helvetica-Bold", 30)
+    p.drawCentredString(width / 2.0, height - 200, "Certificate of Completion")
+
+    # Body Text
+    p.setFont("Helvetica", 18)
+    p.drawCentredString(width / 2.0, height - 280, "This certifies that")
+
+    # Student Name (Dynamic)
+    p.setFont("Helvetica-Bold", 24)
+    student_name = request.user.username.upper()
+    p.drawCentredString(width / 2.0, height - 320, student_name)
+
+    # Context
+    p.setFont("Helvetica", 18)
+    p.drawCentredString(width / 2.0, height - 370, "has successfully completed the course")
+
+    # Course Title (Dynamic)
+    p.setFont("Helvetica-Bold", 22)
+    p.drawCentredString(width / 2.0, height - 410, course.title)
+
+    # Date
+    p.setFont("Helvetica", 14)
+    p.drawString(100, 150, f"Date: {date.today()}")
+
+    # Signature Line
+    p.line(400, 150, 550, 150)
+    p.drawString(400, 130, "Instructor Signature")
+
+    # 3. Finalize and Save
+    p.showPage()
+    p.save()
+
+    # 4. Return the file
+    buffer.seek(0)
+    filename = f"Certificate_{course.title.replace(' ', '_')}.pdf"
+    return FileResponse(buffer, as_attachment=True, filename=filename)

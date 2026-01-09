@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const CourseCard = ({ course }) => {
+const CourseCard = ({ course, onDownloadCertificate }) => {
   // Default to 0 if progress is missing or null
   const progress = course.progress || 0;
 
@@ -49,12 +49,25 @@ const CourseCard = ({ course }) => {
             ></div>
           </div>
 
-          <Link 
-            to={`/courses/${course.id}`} 
-            className="mt-4 block w-full text-center bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-          >
-            {progress > 0 ? "Continue Learning" : "Start Course"}
-          </Link>
+          {/* BUTTON GROUP: Continue + Certificate */}
+          <div className="mt-4 flex gap-2">
+            <Link 
+              to={`/courses/${course.id}`} 
+              className="flex-1 text-center bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              {progress > 0 ? "Continue" : "Start"}
+            </Link>
+
+            {/* GOLD CERTIFICATE BUTTON */}
+            <button
+              onClick={onDownloadCertificate}
+              className="px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors shadow-sm flex items-center justify-center"
+              title="Download Certificate (Requires 100% Completion)"
+            >
+              🏆
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
