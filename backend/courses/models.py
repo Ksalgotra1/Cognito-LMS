@@ -41,6 +41,8 @@ class UserProgress(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)
+    is_quiz_passed = models.BooleanField(default=False)
+    
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

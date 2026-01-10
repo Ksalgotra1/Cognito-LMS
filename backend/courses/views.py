@@ -1,17 +1,18 @@
 import io
 from datetime import date
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-from django.http import FileResponse
 
 # --- REPORTLAB IMPORTS (For PDF Generation) ---
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape # <--- Added landscape
+from reportlab.lib import colors # <--- Added colors for borders
 
-# Import models and serializers
+# --- APP IMPORTS ---
 from .models import Course, Lesson, UserProgress, Question, Choice
 from .serializers import CourseSerializer, QuestionSerializer
 
@@ -99,11 +100,25 @@ def submit_quiz(request, lesson_id):
     else:
         score = 0
     
+    # Determine Pass/Fail Status
+    passed = score >= 70
+
+    # --- SAVE PROGRESS TO DB ---
+    # If they passed, we must record it so they can get their Certificate later.
+    if passed:
+        progress, created = UserProgress.objects.get_or_create(
+            user=request.user,
+            lesson=lesson
+        )
+        progress.is_quiz_passed = True
+        progress.save()
+    # --------------------------------
+    
     return Response({
         "total": total_questions,
         "correct": correct_count,
         "score": round(score, 2),
-        "passed": score >= 70 
+        "passed": passed 
     })
 
 # ---  Certificate Generator ---
@@ -112,83 +127,111 @@ def submit_quiz(request, lesson_id):
 @permission_classes([IsAuthenticated])
 def generate_certificate(request, course_id):
     """
-    Generates a PDF certificate ONLY if the user has completed all lessons.
+    Generates a Professional PDF certificate ONLY if all requirements are met.
     """
     course = get_object_or_404(Course, id=course_id)
+    user = request.user
     
-    # --- 🔒 SECURITY GATEKEEPER ---
+    # ==========================================
+    # 🔒 SECURITY CHECKS (GATEKEEPER)
+    # ==========================================
     
-    # 1. Count TOTAL lessons in this course
-    # (We trace the relationship: Lesson -> Module -> Course)
+    # 1. Video Completion Check
     total_lessons = Lesson.objects.filter(module__course=course).count()
-    
-    # 2. Count COMPLETED lessons for this user
-    # (We trace: UserProgress -> Lesson -> Module -> Course)
     completed_lessons = UserProgress.objects.filter(
-        user=request.user,             # The logged-in student
-        lesson__module__course=course, # Only lessons in THIS course
-        is_completed=True              # Only ones marked "True"
+        user=user, lesson__module__course=course, is_completed=True
     ).count()
 
-    # 3. The Check
-    # If completed is less than total, BLOCK the download.
     if completed_lessons < total_lessons:
-        return Response(
-            {
-                "detail": "Course incomplete.",
-                "completed": completed_lessons,
-                "total": total_lessons,
-                "message": f"You have completed {completed_lessons}/{total_lessons} lessons. Finish all lessons to unlock your certificate."
-            }, 
-            status=403 # 403 Forbidden
-        )
+        return Response({"detail": f"Incomplete videos. ({completed_lessons}/{total_lessons})"}, status=403)
+
+    # 2. Quiz Completion Check
+    lessons_with_quizzes = Lesson.objects.filter(module__course=course, questions__isnull=False).distinct().count()
+    passed_quizzes = UserProgress.objects.filter(
+        user=user, lesson__module__course=course, is_quiz_passed=True
+    ).count()
+
+    if passed_quizzes < lessons_with_quizzes:
+         return Response({"detail": f"Incomplete quizzes. ({passed_quizzes}/{lessons_with_quizzes})"}, status=403)
         
-    # --- 🏆 PDF GENERATION ---
-    # If code reaches here, the user has passed the check.
+    # ==========================================
+    # 🏆 PRO PDF GENERATION
+    # ==========================================
 
-    # 1. Create a memory buffer for the PDF
     buffer = io.BytesIO()
+    # Use LANDSCAPE orientation for a diploma feel
+    p = canvas.Canvas(buffer, pagesize=landscape(letter))
+    width, height = landscape(letter) # width=792, height=612 points
 
-    # 2. Create the PDF Canvas
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter # Standard US Letter size
+    # --- 1. DRAW BORDERS ---
+    # Outer thick blue border
+    p.setStrokeColorRGB(0.1, 0.2, 0.5) # Dark academic blue
+    p.setLineWidth(12)
+    # rect(x, y, width, height) - giving 30px margin
+    p.rect(30, 30, width-60, height-60)
 
-    # --- DRAWING THE CERTIFICATE ---
+    # Inner thinner gold border
+    p.setStrokeColorRGB(0.8, 0.7, 0.2) # Gold color
+    p.setLineWidth(3)
+    # rect(x, y, width, height) - giving 45px margin
+    p.rect(45, 45, width-90, height-90)
+
+    # Reset colors for text
+    p.setFillColor(colors.black)
+    p.setStrokeColor(colors.black)
+
+    # --- 2. BRANDING (Top Right) ---
+    p.setFont("Helvetica-BoldOblique", 18)
+    p.setFillColorRGB(0.1, 0.2, 0.5) # Match blue border
+    # 'drawRightString' aligns text to the right of the coordinates
+    p.drawRightString(width - 70, height - 85, "Cognito Academy")
+
+    # --- 3. MAIN CONTENT (Centered) ---
+    center_x = width / 2.0
+
+    # Header
+    p.setFont("Helvetica-Bold", 36)
+    p.setFillColor(colors.black)
+    p.drawCentredString(center_x, height - 160, "CERTIFICATE OF COMPLETION")
+
+    # Sub-header
+    p.setFont("Helvetica", 16)
+    p.drawCentredString(center_x, height - 210, "This is to certify that")
+
+    # STUDENT NAME (Big and Fancy)
+    student_name = user.username.upper()
+    # If you have first/last name configured:
+    # student_name = f"{user.first_name} {user.last_name}".upper()
     
-    # Title
-    p.setFont("Helvetica-Bold", 30)
-    p.drawCentredString(width / 2.0, height - 200, "Certificate of Completion")
+    p.setFont("Times-BoldItalic", 40) # Using Times for a fancier look
+    p.drawCentredString(center_x, height - 270, student_name)
 
-    # Body Text
-    p.setFont("Helvetica", 18)
-    p.drawCentredString(width / 2.0, height - 280, "This certifies that")
+    # Context Text
+    p.setFont("Helvetica", 16)
+    p.drawCentredString(center_x, height - 320, "has successfully completed the online course")
 
-    # Student Name (Dynamic)
-    p.setFont("Helvetica-Bold", 24)
-    student_name = request.user.username.upper()
-    p.drawCentredString(width / 2.0, height - 320, student_name)
+    # COURSE TITLE (Big)
+    p.setFont("Times-Bold", 28)
+    p.drawCentredString(center_x, height - 370, course.title)
 
-    # Context
-    p.setFont("Helvetica", 18)
-    p.drawCentredString(width / 2.0, height - 370, "has successfully completed the course")
+    # --- 4. FOOTER SECTION (Date & Signature) ---
+    footer_y = 120
 
-    # Course Title (Dynamic)
-    p.setFont("Helvetica-Bold", 22)
-    p.drawCentredString(width / 2.0, height - 410, course.title)
-
-    # Date
+    # Date on left
     p.setFont("Helvetica", 14)
-    p.drawString(100, 150, f"Date: {date.today()}")
+    date_str = date.today().strftime("%B %d, %Y") # e.g., January 10, 2026
+    p.drawString(100, footer_y, f"Awarded: {date_str}")
 
-    # Signature Line
-    p.line(400, 150, 550, 150)
-    p.drawString(400, 130, "Instructor Signature")
+    # Signature on right
+    p.setLineWidth(2)
+    p.line(width - 300, footer_y + 10, width - 100, footer_y + 10) # Signature Line
+    p.setFont("Helvetica-Oblique", 14)
+    p.drawString(width - 280, footer_y - 10, "Lead Instructor, Cognito")
 
-    # 3. Finalize and Save
+    # Finalize
     p.showPage()
     p.save()
 
-    # 4. Return the file
     buffer.seek(0)
-    filename = f"Certificate_{course.title.replace(' ', '_')}.pdf"
+    filename = f"Cognito_Certificate_{course.title.replace(' ', '_')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
