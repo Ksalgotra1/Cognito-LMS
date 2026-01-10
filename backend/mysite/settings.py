@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",            # <--- Add this
     "rest_framework_simplejwt",
-    "polls.apps.PollsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
