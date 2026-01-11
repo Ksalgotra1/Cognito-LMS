@@ -5,7 +5,8 @@ from .views import (
     toggle_lesson_completion, 
     get_quiz,      
     submit_quiz,
-    generate_certificate    
+    generate_certificate,
+    CertificateVerifyView    
 )
 
 urlpatterns = [
@@ -25,4 +26,7 @@ urlpatterns = [
     # --- Certificate Route ---
     # This generates the PDF for a specific course
     path('<int:course_id>/certificate/', generate_certificate, name='get-certificate'),
+
+    # Certifictae Verification Route 
+    path('certificate/verify/<uuid:certificate_id>/', CertificateVerifyView.as_view(), name='certificate-verify'),
 ]

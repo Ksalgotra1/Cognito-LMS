@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.conf import settings
 
@@ -66,3 +67,31 @@ class Choice(models.Model):
 
     def __str__(self):
         return self.text
+    
+class Certificate(models.Model):
+    """
+    Represents a permanent proof of course completion.
+    Uses a UUID to allow external verification without exposing sequential IDs.
+    """
+    # Relationships
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    
+    # Metadata
+    issued_at = models.DateTimeField(auto_now_add=True)
+    
+    # The "Magic" Field: A global unique ID (e.g., 550e8400-e29b...)
+    # We use this in the URL: /verify/<certificate_id>
+    certificate_id = models.UUIDField(
+        default=uuid.uuid4, 
+        editable=False, 
+        unique=True
+    )
+
+    class Meta:
+        # DB Constraint: A user can only have ONE certificate per course.
+        unique_together = ('user', 'course')
+
+    def __str__(self):
+        # Convert UUID to string to avoid errors in Admin panel
+        return f"Certificate: {self.user.username} - {self.course.title}"

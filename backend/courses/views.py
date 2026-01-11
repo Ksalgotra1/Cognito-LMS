@@ -1,5 +1,7 @@
 import io
+import qrcode  # <--- For QR Code generation
 from datetime import date
+from django.conf import settings
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
@@ -9,12 +11,13 @@ from rest_framework.response import Response
 
 # --- REPORTLAB IMPORTS (For PDF Generation) ---
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, landscape # <--- Added landscape
-from reportlab.lib import colors # <--- Added colors for borders
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib import colors
+from reportlab.lib.utils import ImageReader  # <--- To read image from memory
 
 # --- APP IMPORTS ---
-from .models import Course, Lesson, UserProgress, Question, Choice
-from .serializers import CourseSerializer, QuestionSerializer
+from .models import Course, Lesson, UserProgress, Question, Choice, Certificate
+from .serializers import CourseSerializer, QuestionSerializer, CertificateSerializer
 
 # --- Course Views ---
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -65,8 +68,7 @@ def get_quiz(request, lesson_id):
 @permission_classes([IsAuthenticated])
 def submit_quiz(request, lesson_id):
     """
-    Grade the quiz on the server.
-    Expected Payload: { "question_id": "choice_id", ... }
+    Grade the quiz on the server and save progress if passed.
     """
     lesson = get_object_or_404(Lesson, id=lesson_id)
     questions = lesson.questions.all()
@@ -127,7 +129,11 @@ def submit_quiz(request, lesson_id):
 @permission_classes([IsAuthenticated])
 def generate_certificate(request, course_id):
     """
-    Generates a Professional PDF certificate ONLY if all requirements are met.
+    Generates a Professional PDF certificate.
+    Features:
+    - Unique UUID Verification
+    - QR Code (Scannable)
+    - Clickable Link (Digital Verification)
     """
     course = get_object_or_404(Course, id=course_id)
     user = request.user
@@ -155,78 +161,126 @@ def generate_certificate(request, course_id):
          return Response({"detail": f"Incomplete quizzes. ({passed_quizzes}/{lessons_with_quizzes})"}, status=403)
         
     # ==========================================
-    # 🏆 PRO PDF GENERATION
+    # 💾 MINTING THE CERTIFICATE (DB)
+    # ==========================================
+    
+    # Create or Get the permanent record (UUID)
+    cert_obj, created = Certificate.objects.get_or_create(
+        user=user,
+        course=course
+    )
+
+    # ==========================================
+    # 📱 QR CODE GENERATION
+    # ==========================================
+    
+    # 1. The URL (Currently points to API for testing)
+    # In production, you will change this to: https://your-site.com/verify/UUID
+    verify_url = f"{settings.SITE_URL}/api/courses/certificate/verify/{cert_obj.certificate_id}/"
+    
+    # 2. Create QR Object
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(verify_url)
+    qr.make(fit=True)
+    
+    # 3. Generate Image to Memory
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    qr_buffer = io.BytesIO()
+    qr_img.save(qr_buffer, format="PNG")
+    qr_buffer.seek(0)
+    
+    # 4. Convert to ReportLab ImageReader
+    qr_code_image = ImageReader(qr_buffer)
+
+    # ==========================================
+    # 🏆 PRO PDF DRAWING
     # ==========================================
 
     buffer = io.BytesIO()
-    # Use LANDSCAPE orientation for a diploma feel
     p = canvas.Canvas(buffer, pagesize=landscape(letter))
-    width, height = landscape(letter) # width=792, height=612 points
+    width, height = landscape(letter)
 
     # --- 1. DRAW BORDERS ---
-    # Outer thick blue border
     p.setStrokeColorRGB(0.1, 0.2, 0.5) # Dark academic blue
     p.setLineWidth(12)
-    # rect(x, y, width, height) - giving 30px margin
-    p.rect(30, 30, width-60, height-60)
+    p.rect(30, 30, width-60, height-60) # Outer Border
 
-    # Inner thinner gold border
     p.setStrokeColorRGB(0.8, 0.7, 0.2) # Gold color
     p.setLineWidth(3)
-    # rect(x, y, width, height) - giving 45px margin
-    p.rect(45, 45, width-90, height-90)
+    p.rect(45, 45, width-90, height-90) # Inner Border
 
-    # Reset colors for text
     p.setFillColor(colors.black)
     p.setStrokeColor(colors.black)
 
-    # --- 2. BRANDING (Top Right) ---
+    # --- 2. BRANDING ---
     p.setFont("Helvetica-BoldOblique", 18)
-    p.setFillColorRGB(0.1, 0.2, 0.5) # Match blue border
-    # 'drawRightString' aligns text to the right of the coordinates
+    p.setFillColorRGB(0.1, 0.2, 0.5)
     p.drawRightString(width - 70, height - 85, "Cognito Academy")
 
-    # --- 3. MAIN CONTENT (Centered) ---
+    # --- 3. MAIN CONTENT ---
     center_x = width / 2.0
 
-    # Header
     p.setFont("Helvetica-Bold", 36)
     p.setFillColor(colors.black)
     p.drawCentredString(center_x, height - 160, "CERTIFICATE OF COMPLETION")
 
-    # Sub-header
     p.setFont("Helvetica", 16)
     p.drawCentredString(center_x, height - 210, "This is to certify that")
 
-    # STUDENT NAME (Big and Fancy)
+    # Student Name
     student_name = user.username.upper()
-    # If you have first/last name configured:
-    # student_name = f"{user.first_name} {user.last_name}".upper()
-    
-    p.setFont("Times-BoldItalic", 40) # Using Times for a fancier look
+    p.setFont("Times-BoldItalic", 40)
     p.drawCentredString(center_x, height - 270, student_name)
 
-    # Context Text
     p.setFont("Helvetica", 16)
     p.drawCentredString(center_x, height - 320, "has successfully completed the online course")
 
-    # COURSE TITLE (Big)
+    # Course Title
     p.setFont("Times-Bold", 28)
     p.drawCentredString(center_x, height - 370, course.title)
 
-    # --- 4. FOOTER SECTION (Date & Signature) ---
-    footer_y = 120
+    # --- 4. FOOTER & QR CODE ---
+    footer_y = 160
 
-    # Date on left
+    # Date
     p.setFont("Helvetica", 14)
-    date_str = date.today().strftime("%B %d, %Y") # e.g., January 10, 2026
-    p.drawString(100, footer_y, f"Awarded: {date_str}")
+    date_str = cert_obj.issued_at.strftime("%B %d, %Y") 
+    p.drawString(100, footer_y, f"Issued: {date_str}")
 
-    # Signature on right
+    # Signature
     p.setLineWidth(2)
-    p.line(width - 300, footer_y + 10, width - 100, footer_y + 10) # Signature Line
+    p.line(width - 300, footer_y + 10, width - 100, footer_y + 10)
     p.setFont("Helvetica-Oblique", 14)
     p.drawString(width - 280, footer_y - 10, "Lead Instructor, Cognito")
+
+    # --- DRAW QR CODE (Bottom Right) ---
+    
+    # Coordinates and Size
+    qr_x = width - 160
+    qr_y = 40
+    qr_size = 80
+
+    # 1. Draw the Image
+    p.drawImage(qr_code_image, qr_x, qr_y, width=qr_size, height=qr_size)
+    
+    # 2. Make it CLICKABLE 
+    # Arguments: URL, (x1, y1, x2, y2), relative=1
+    p.linkURL(verify_url, (qr_x, qr_y, qr_x + qr_size, qr_y + qr_size), relative=1)
+    
+    # 3. Draw FULL UUID Text below QR
+    p.setFont("Helvetica", 6) # Small size to fit 36 chars
+    p.setFillColor(colors.black) 
+    
+    uuid_str = str(cert_obj.certificate_id)
+    
+    # Center text relative to QR code
+    center_qr_x = qr_x + (qr_size / 2)
+    p.drawCentredString(center_qr_x, qr_y - 10, f"ID: {uuid_str}")
 
     # Finalize
     p.showPage()
@@ -235,3 +289,13 @@ def generate_certificate(request, course_id):
     buffer.seek(0)
     filename = f"Cognito_Certificate_{course.title.replace(' ', '_')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
+
+class CertificateVerifyView(generics.RetrieveAPIView):
+    """
+    Public Endpoint: Allows anyone with the UUID to verify a certificate.
+    No Login Required.
+    """
+    queryset = Certificate.objects.all()
+    serializer_class = CertificateSerializer
+    permission_classes = [permissions.AllowAny] # <--- Public Access
+    lookup_field = 'certificate_id' # <--- Lookup by UUID

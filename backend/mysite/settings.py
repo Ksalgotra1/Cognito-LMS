@@ -156,3 +156,8 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
 }
+
+# The URL of  server 
+# For now, it is localhost.
+SITE_URL = "http://127.0.0.1:8000"
+

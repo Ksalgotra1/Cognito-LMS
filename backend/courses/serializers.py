@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course, Module, Lesson, UserProgress, Question, Choice  
+from .models import Course, Module, Lesson, UserProgress, Question, Choice, Certificate  
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -67,3 +67,13 @@ class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = ['id', 'text', 'choices']
+
+class CertificateSerializer(serializers.ModelSerializer):
+    # Fetch the actual text from the related models
+    course_title = serializers.CharField(source='course.title', read_only=True)
+    student_name = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = Certificate
+        # Only show what the employer needs to see
+        fields = ['certificate_id', 'student_name', 'course_title', 'issued_at']
