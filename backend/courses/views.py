@@ -2,7 +2,8 @@ import io
 import qrcode  # <--- For QR Code generation
 from datetime import date
 from django.conf import settings
-from django.http import FileResponse
+from django.http import FileResponse, JsonResponse
+from django.apps import apps
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
@@ -299,3 +300,34 @@ class CertificateVerifyView(generics.RetrieveAPIView):
     serializer_class = CertificateSerializer
     permission_classes = [permissions.AllowAny] # <--- Public Access
     lookup_field = 'certificate_id' # <--- Lookup by UUID
+
+def search_content(request):
+    """
+    High-Performance Search Endpoint.
+    
+    Instead of hitting the database with a slow SQL LIKE query, 
+    this view queries the In-Memory Trie stored in the AppConfig.
+    Response time is typically < 5ms.
+    """
+    query = request.GET.get('q', '')
+    
+    # Return empty list for empty queries
+    if not query:
+        return JsonResponse([], safe=False)
+
+    try:
+        # Access the global Trie instance initialized in apps.py
+        trie = apps.get_app_config('courses').trie
+        
+        # Safety check: If server didn't initialize correctly
+        if not trie:
+            return JsonResponse({"error": "Search engine not ready"}, status=503)
+
+        # Perform the O(k) search
+        results = trie.search(query)
+        
+        # Limit to top 10 results to keep the payload light
+        return JsonResponse(results[:10], safe=False)
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

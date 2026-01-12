@@ -6,7 +6,8 @@ from .views import (
     get_quiz,      
     submit_quiz,
     generate_certificate,
-    CertificateVerifyView    
+    CertificateVerifyView,
+    search_content    
 )
 
 urlpatterns = [
@@ -14,6 +15,8 @@ urlpatterns = [
     path('', CourseListCreateView.as_view(), name='course-list-create'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
     
+    # --- Search Route (Layer 1: Trie) ---
+    path('search/', search_content, name='search-content'),
     # Lesson Completion Route
     path('lessons/<int:lesson_id>/complete/', toggle_lesson_completion, name='toggle-completion'),
 
