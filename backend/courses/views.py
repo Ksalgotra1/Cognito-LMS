@@ -1,9 +1,12 @@
+# backend/courses/views.py
+
 import io
 import qrcode  # <--- For QR Code generation
 from datetime import date
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from django.apps import apps
+from django.db.models import Count, Q  # <--- Added for Analytics
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
@@ -17,10 +20,12 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader  # <--- To read image from memory
 
 # --- APP IMPORTS ---
-from .models import Course, Lesson, UserProgress, Question, Choice, Certificate
+# ✅ ADDED 'Enrollment' to the imports here
+from .models import Course, Lesson, UserProgress, Question, Choice, Certificate, Enrollment
 from .serializers import CourseSerializer, QuestionSerializer, CertificateSerializer
 
 # --- Course Views ---
+
 class CourseListCreateView(generics.ListCreateAPIView):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
@@ -34,7 +39,89 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+
+# --- STUDENT ANALYTICS DASHBOARD ---
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_dashboard_stats(request):
+    """
+    Returns analytics for the student dashboard:
+    - List of enrolled courses with progress %
+    - 'Next Lesson' to resume learning
+    - Total stats
+    """
+    user = request.user
+    
+    # 1. Get courses via the new Enrollment model
+    enrollments = Enrollment.objects.filter(student=user).select_related('course')
+    
+    course_cards = []
+    
+    for enrollment in enrollments:
+        course = enrollment.course
+        
+        # A. Calculate Progress %
+        # Logic: Count total lessons in all modules of the course
+        total_lessons = Lesson.objects.filter(module__course=course).count()
+        
+        completed_lessons = UserProgress.objects.filter(
+            user=user, 
+            lesson__module__course=course, 
+            is_completed=True
+        ).count()
+        
+        progress_percent = 0
+        if total_lessons > 0:
+            progress_percent = int((completed_lessons / total_lessons) * 100)
+            
+        # B. Find the "Up Next" Lesson (First incomplete lesson)
+        # Get all lesson IDs in this course (ordered by module then lesson order)
+        all_lesson_ids = Lesson.objects.filter(module__course=course)\
+            .order_by('module__order', 'order')\
+            .values_list('id', flat=True)
+        
+        # Get completed lesson IDs
+        completed_lesson_ids = UserProgress.objects.filter(
+            user=user, 
+            lesson__module__course=course, 
+            is_completed=True
+        ).values_list('lesson_id', flat=True)
+        
+        # Find first ID in 'all' that is not in 'completed'
+        next_lesson_id = next((lid for lid in all_lesson_ids if lid not in completed_lesson_ids), None)
+        
+        next_lesson_title = "Course Completed! 🏆"
+        next_lesson_url = None
+        
+        if next_lesson_id:
+            next_lesson_obj = Lesson.objects.get(id=next_lesson_id)
+            next_lesson_title = next_lesson_obj.title
+            # We construct the URL for the frontend router
+            next_lesson_url = f"/courses/{course.id}"
+
+        course_cards.append({
+            "id": course.id,
+            "title": course.title,
+            "thumbnail": course.thumbnail_url, 
+            "progress": progress_percent,
+            "completed_lessons": completed_lessons,
+            "total_lessons": total_lessons,
+            "next_lesson_title": next_lesson_title,
+            "next_lesson_url": next_lesson_url
+        })
+
+    return Response({
+        "enrolled_courses": course_cards,
+        "stats": {
+            "total_enrolled": enrollments.count(),
+            "total_completed_lessons": UserProgress.objects.filter(user=user, is_completed=True).count()
+        }
+    })
+
+
 # --- Lesson Completion Logic ---
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_lesson_completion(request, lesson_id):
@@ -50,6 +137,7 @@ def toggle_lesson_completion(request, lesson_id):
         "lesson_id": lesson.id,
         "is_completed": progress.is_completed
     })
+
 
 # --- Quiz Engine Logic ---
 
@@ -123,6 +211,7 @@ def submit_quiz(request, lesson_id):
         "score": round(score, 2),
         "passed": passed 
     })
+
 
 # ---  Certificate Generator ---
 
@@ -291,6 +380,7 @@ def generate_certificate(request, course_id):
     filename = f"Cognito_Certificate_{course.title.replace(' ', '_')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
 
+
 class CertificateVerifyView(generics.RetrieveAPIView):
     """
     Public Endpoint: Allows anyone with the UUID to verify a certificate.
@@ -300,6 +390,9 @@ class CertificateVerifyView(generics.RetrieveAPIView):
     serializer_class = CertificateSerializer
     permission_classes = [permissions.AllowAny] # <--- Public Access
     lookup_field = 'certificate_id' # <--- Lookup by UUID
+
+
+# --- High Performance Search (Trie) ---
 
 def search_content(request):
     """

@@ -7,10 +7,13 @@ from .views import (
     submit_quiz,
     generate_certificate,
     CertificateVerifyView,
-    search_content    
+    search_content,
+    student_dashboard_stats    
 )
 
 urlpatterns = [
+    # --- Dashboard Route (MUST BE AT THE TOP) ---
+    path('dashboard/stats/', student_dashboard_stats, name='dashboard-stats'),
     # Course Routes
     path('', CourseListCreateView.as_view(), name='course-list-create'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
