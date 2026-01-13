@@ -6,6 +6,7 @@ import SignupPage from './features/auth/components/SignupPage';
 import CourseDetail from './features/courses/components/CourseDetail';
 import Quiz from './features/courses/components/Quiz';
 import SearchBar from './components/ui/SearchBar';
+import CertificateVerify from './features/courses/pages/CertificateVerify';
 
 // Define (Navbar + Layout)
 // This wrapper ensures the Search Bar appears on every protected page
@@ -63,6 +64,9 @@ function App() {
         {/* Public Routes (No Search Bar here) */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<SignupPage />} />
+
+        {/* Verification Page (Public) */}
+        <Route path="/verify/:id" element={<CertificateVerify />} />
         
         {/* Redirect root to dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

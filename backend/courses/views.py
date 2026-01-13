@@ -264,9 +264,9 @@ def generate_certificate(request, course_id):
     # 📱 QR CODE GENERATION
     # ==========================================
     
-    # 1. The URL (Currently points to API for testing)
-    # In production, you will change this to: https://your-site.com/verify/UUID
-    verify_url = f"{settings.SITE_URL}/api/courses/certificate/verify/{cert_obj.certificate_id}/"
+    # 1. The URL 
+    # ✅ UPDATED: Points to React Frontend (localhost:5173) instead of Backend API
+    verify_url = f"http://localhost:5173/verify/{cert_obj.certificate_id}"
     
     # 2. Create QR Object
     qr = qrcode.QRCode(

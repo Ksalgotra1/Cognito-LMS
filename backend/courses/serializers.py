@@ -69,11 +69,13 @@ class QuestionSerializer(serializers.ModelSerializer):
         fields = ['id', 'text', 'choices']
 
 class CertificateSerializer(serializers.ModelSerializer):
-    # Fetch the actual text from the related models
-    course_title = serializers.CharField(source='course.title', read_only=True)
-    student_name = serializers.CharField(source='user.username', read_only=True)
+    # Change 'student_name' -> 'student' to match React
+    student = serializers.CharField(source='user.username', read_only=True)
+    
+    # Change 'course_title' -> 'course' to match React
+    course = serializers.CharField(source='course.title', read_only=True)
 
     class Meta:
         model = Certificate
-        # Only show what the employer needs to see
-        fields = ['certificate_id', 'student_name', 'course_title', 'issued_at']
+        # Update the fields list to match the new names
+        fields = ['certificate_id', 'student', 'course', 'issued_at']
