@@ -8,31 +8,33 @@ from .views import (
     generate_certificate,
     CertificateVerifyView,
     search_content,
-    student_dashboard_stats    
+    student_dashboard_stats,
+    GenerateStudyPlanView  
 )
 
 urlpatterns = [
     # --- Dashboard Route (MUST BE AT THE TOP) ---
     path('dashboard/stats/', student_dashboard_stats, name='dashboard-stats'),
-    # Course Routes
+    
+    # --- Course Routes ---
     path('', CourseListCreateView.as_view(), name='course-list-create'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
     
     # --- Search Route (Layer 1: Trie) ---
     path('search/', search_content, name='search-content'),
-    # Lesson Completion Route
+    
+    # --- Lesson Completion Route ---
     path('lessons/<int:lesson_id>/complete/', toggle_lesson_completion, name='toggle-completion'),
 
-    # Quiz Routes ---
-    # GET: Fetch questions
+    # --- Quiz Routes ---
     path('lessons/<int:lesson_id>/quiz/', get_quiz, name='get-quiz'),
-    # POST: Submit answers for grading
     path('lessons/<int:lesson_id>/quiz/submit/', submit_quiz, name='submit-quiz'),
 
-    # --- Certificate Route ---
-    # This generates the PDF for a specific course
+    # --- Certificate Routes ---
     path('<int:course_id>/certificate/', generate_certificate, name='get-certificate'),
-
-    # Certifictae Verification Route 
     path('certificate/verify/<uuid:certificate_id>/', CertificateVerifyView.as_view(), name='certificate-verify'),
+
+    # --- Study Scheduler Route (The New Algorithmic Feature) ---
+    # POST request here triggers the Backtracking/Greedy algorithm
+    path('<int:course_id>/generate-plan/', GenerateStudyPlanView.as_view(), name='generate-plan'),
 ]

@@ -1,4 +1,5 @@
 import sys
+import os
 from django.apps import AppConfig
 
 class CoursesConfig(AppConfig):
@@ -9,50 +10,48 @@ class CoursesConfig(AppConfig):
     trie = None
 
     def ready(self):
-        """
-        This method is executed once when the Django application starts.
-        We use it to initialize the in-memory Trie and populate it with data 
-        from the database.
-        """
-        # Check if the server is actually running. This prevents the code from
-        # running during management commands like 'makemigrations' or 'migrate'.
-        is_running_server = 'runserver' in sys.argv
-        
-        if not is_running_server:
+        # 1. Server Check (Prevents double loading)
+        if os.environ.get('RUN_MAIN', None) != 'true':
             return
 
-        # Import models inside the method to avoid "AppRegistryNotReady" errors
-        # because this method runs before all apps are fully loaded.
-        from .models import Course, Lesson
-        from .trie import CourseTrie
+        # 2. Prevent running during migrations
+        if 'migrate' in sys.argv or 'makemigrations' in sys.argv:
+            return
 
-        print("Initialization: Building In-Memory Search Trie...")
+        from .models import Course, Lesson
+        # ✅ FIX: Import 'CourseTrie' (which is what you named it in trie.py)
+        from .trie import CourseTrie 
+
+        print("🔍 [Search Engine] Building In-Memory Index...")
         
-        # Initialize the global Trie instance
+        # Initialize
         CoursesConfig.trie = CourseTrie()
 
-        # 1. Fetch and Index all Courses
-        # We only need specific fields, not the entire object overhead
+        # 3. Index COURSES
         courses = Course.objects.all().values('id', 'title')
         for course in courses:
-            CoursesConfig.trie.insert(course['title'], {
+            CoursesConfig.trie.insert(course['title'], { 
                 'id': course['id'],
                 'type': 'course',
                 'title': course['title'],
                 'url': f"/courses/{course['id']}"
             })
 
-        # 2. Fetch and Index all Lessons
-        # We use select_related to minimize database queries if we needed foreign keys,
-        # but here values() is efficient enough.
-        lessons = Lesson.objects.all().values('id', 'title', 'module__course__title')
+        # 4. Index LESSONS
+        lessons = Lesson.objects.all().values('id', 'title', 'module__course__title', 'module__course__id')
+        
         for lesson in lessons:
-            CoursesConfig.trie.insert(lesson['title'], {
-                'id': lesson['id'],
-                'type': 'lesson',
-                'title': lesson['title'],
-                'course': lesson['module__course__title'], # Context for the user
-                'url': f"/lessons/{lesson['id']}"
-            })
+            if lesson['module__course__id']: 
+                CoursesConfig.trie.insert(lesson['title'], {
+                    'id': lesson['id'],
+                    'type': 'lesson',
+                    'title': lesson['title'],
+                    
+                    # ✅ THE FIX: We add 'course' because your Frontend asks for item.course
+                    'course': lesson['module__course__title'], 
+                    
+                    'course_title': lesson['module__course__title'], # Keeping this as backup
+                    'url': f"/courses/{lesson['module__course__id']}"
+                })
             
-        print(f"Trie Built Successfully. Indexed {len(courses) + len(lessons)} items in RAM.")
+        print(f"✅ [Search Engine] Indexed {len(courses)} Courses and {len(lessons)} Lessons.")

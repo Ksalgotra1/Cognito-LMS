@@ -26,9 +26,8 @@ const Dashboard = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const response = await client.get('/api/courses/dashboard/stats/', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        // ✅ CLEANED: Removed manual headers. Interceptor handles auth now.
+        const response = await client.get('/api/courses/dashboard/stats/');
         setData(response.data);
       } catch (err) {
         console.error("Failed to load dashboard:", err);
@@ -77,9 +76,8 @@ const Dashboard = () => {
     try {
       console.log(`Downloading certificate for: ${selectedCourse.title}`);
 
-      // ✅ UPDATED URL: /courses/{ID}/certificate/
+      // ✅ CLEANED: Removed manual headers. Kept responseType: 'blob'.
       const response = await client.get(`/api/courses/${selectedCourse.id}/certificate/`, {
-        headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob', 
       });
 
@@ -168,11 +166,30 @@ const Dashboard = () => {
                <div className="mb-6 animate-fade-in">
                  <h2 className="text-3xl font-bold text-gray-900 mb-2">{heroCourse.title}</h2>
                  <p className="text-gray-500 text-sm mb-4">{heroCourse.total_lessons} Lessons • Keep going!</p>
-                 <div className="w-full bg-gray-100 rounded-full h-4 mb-2 overflow-hidden">
-                   <div className="bg-blue-600 h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${heroCourse.progress}%` }}></div>
+                 
+                 {/* ✅ 1. Progress Bar (Enhanced) */}
+                 <div className="w-full bg-gray-100 rounded-full h-4 mb-2 overflow-hidden shadow-inner">
+                   <div 
+                     className="bg-blue-600 h-full rounded-full transition-all duration-700 ease-out relative" 
+                     style={{ width: `${heroCourse.progress}%` }}
+                   >
+                      <div className="absolute top-0 left-0 right-0 bottom-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                   </div>
                  </div>
+
+                 {/* ✅ 2. Progress Text (The Missing Piece!) */}
+                 <div className="flex justify-between items-center mb-4">
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      {heroCourse.progress}% Completed
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {heroCourse.completed_lessons || 0}/{heroCourse.total_lessons} Steps
+                    </span>
+                 </div>
+
                </div>
-               <button onClick={() => navigate(heroCourse.next_lesson_url || `/courses/${heroCourse.id}`)} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
+               
+               <button onClick={() => navigate(heroCourse.next_lesson_url || `/courses/${heroCourse.id}`)} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2 w-fit">
                    <Play size={20} fill="currentColor" /> Continue Lesson
                </button>
              </div>

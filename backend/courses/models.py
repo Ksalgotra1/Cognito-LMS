@@ -5,11 +5,49 @@ from django.conf import settings
 class Course(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField()
-    # The 'Instructor' is a User. If the user is deleted, their courses disappear (CASCADE).
     instructor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='courses')
-    # Use a generic placeholder if no image is uploaded
     thumbnail_url = models.URLField(blank=True, null=True) 
+    
+    # Directed Acyclic Graph (DAG) implementation for course dependencies.
+    # symmetrical=False ensures directional edges (A requires B != B requires A).
+    prerequisites = models.ManyToManyField(
+        'self', 
+        symmetrical=False, 
+        blank=True, 
+        related_name='required_for' 
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def creates_cycle(self, candidate_prerequisite):
+        """
+        Performs a Depth First Search (DFS) to detect circular dependencies.
+        Returns True if adding 'candidate_prerequisite' results in a cycle.
+        Complexity: O(V + E)
+        """
+        # Edge case: self-dependency
+        if self == candidate_prerequisite:
+            return True
+
+        stack = [candidate_prerequisite]
+        visited = set()
+
+        while stack:
+            current = stack.pop()
+            
+            if current in visited:
+                continue
+            visited.add(current)
+
+            # Cycle detected if we encounter the current instance in the traversal
+            if current == self:
+                return True
+            
+            # Add parents to stack
+            for parent in current.prerequisites.all():
+                stack.append(parent)
+                
+        return False
 
     def __str__(self):
         return self.title
@@ -17,11 +55,10 @@ class Course(models.Model):
 class Module(models.Model):
     course = models.ForeignKey(Course, related_name='modules', on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
-    # We use 'order' to keep modules in sequence (Week 1, Week 2...)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['order'] # Auto-sort when we fetch data
+        ordering = ['order']
 
     def __str__(self):
         return f"{self.course.title} - {self.title}"
@@ -31,6 +68,9 @@ class Lesson(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField(help_text="Markdown content or Video URL")
     order = models.PositiveIntegerField(default=0)
+    
+    # Estimated duration in minutes for the Study Scheduler algorithm
+    duration_minutes = models.PositiveIntegerField(default=30)
 
     class Meta:
         ordering = ['order']
@@ -47,7 +87,7 @@ class UserProgress(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('user', 'lesson')  # Prevents duplicate rows for same user-lesson pair
+        unique_together = ('user', 'lesson')
 
     def __str__(self):
         return f"{self.user.email} - {self.lesson.title}"
@@ -70,18 +110,13 @@ class Choice(models.Model):
     
 class Certificate(models.Model):
     """
-    Represents a permanent proof of course completion.
-    Uses a UUID to allow external verification without exposing sequential IDs.
+    Issued upon course completion.
+    Uses UUID to prevent ID enumeration attacks on public verification URLs.
     """
-    # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    
-    # Metadata
     issued_at = models.DateTimeField(auto_now_add=True)
     
-    # The "Magic" Field: A global unique ID (e.g., 550e8400-e29b...)
-    # We use this in the URL: /verify/<certificate_id>
     certificate_id = models.UUIDField(
         default=uuid.uuid4, 
         editable=False, 
@@ -89,11 +124,9 @@ class Certificate(models.Model):
     )
 
     class Meta:
-        # DB Constraint: A user can only have ONE certificate per course.
         unique_together = ('user', 'course')
 
     def __str__(self):
-        # Convert UUID to string to avoid errors in Admin panel
         return f"Certificate: {self.user.username} - {self.course.title}"
     
 class Enrollment(models.Model):
@@ -102,7 +135,31 @@ class Enrollment(models.Model):
     enrolled_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('student', 'course') # Prevent double enrollment
+        unique_together = ('student', 'course')
 
     def __str__(self):
         return f"{self.student.username} enrolled in {self.course.title}"
+
+class StudyPlan(models.Model):
+    """
+    Stores the algorithmic schedule generated via Backtracking/Greedy allocation.
+    Maps user availability to lesson duration.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    
+    target_date = models.DateField()
+    
+    # Structure: {"Mon": 120, "Tue": 0, ...} (Minutes per day)
+    weekly_availability = models.JSONField(default=dict)
+    
+    # Structure: [{"date": "2024-01-01", "lessons": [...]}, ...]
+    generated_schedule = models.JSONField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'course')
+
+    def __str__(self):
+        return f"Plan: {self.user.username} - {self.course.title}"
