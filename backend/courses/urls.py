@@ -9,7 +9,8 @@ from .views import (
     CertificateVerifyView,
     search_content,
     student_dashboard_stats,
-    GenerateStudyPlanView  
+    GenerateStudyPlanView,
+    AskAIView  
 )
 
 urlpatterns = [
@@ -20,6 +21,9 @@ urlpatterns = [
     path('', CourseListCreateView.as_view(), name='course-list-create'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
     
+    # --- Ask AI Route ---
+    path('<int:course_id>/ask/', AskAIView.as_view(), name='ask-ai'),
+
     # --- Search Route (Layer 1: Trie) ---
     path('search/', search_content, name='search-content'),
     

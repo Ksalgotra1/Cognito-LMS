@@ -3,14 +3,17 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { getCourse, toggleLessonCompletion } from '../slices/coursesSlice';
 
-// ✅ Custom Components
+// Custom Components
 import CourseGraph from './CourseGraph';
 import StudyPlanModal from './StudyPlanModal';
+import AiTutor from './AiTutor'; //  Import AI Tutor
+import CodeEditor from '../../../components/ui/CodeEditor'; //  Import Code Editor
 
-// ✅ Icons
+//  Icons
 import { 
   ArrowLeft, Calendar, CheckCircle, Circle, PlayCircle, 
-  FileText, FileQuestion, Layout, Video, Check, GitMerge 
+  FileText, FileQuestion, Layout, Video, Check, GitMerge,
+  Code, Sparkles //  Icons for Tabs
 } from 'lucide-react';
 
 const CourseDetail = () => {
@@ -24,6 +27,7 @@ const CourseDetail = () => {
   // --- LOCAL STATE ---
   const [activeLesson, setActiveLesson] = useState(null);
   const [showScheduler, setShowScheduler] = useState(false);
+  const [activeTab, setActiveTab] = useState('video'); //  'video' | 'lab'
 
   // --- 1. FETCH DATA ---
   useEffect(() => {
@@ -143,7 +147,6 @@ const CourseDetail = () => {
                          <span className="truncate">{lesson.title}</span>
                       </div>
                       
-                      {/* ✅ FIX: Display REAL DB duration. If missing, show nothing. */}
                       <span className="text-[10px] text-gray-400">
                         {lesson.duration_minutes ? `${lesson.duration_minutes}m` : ''}
                       </span>
@@ -161,103 +164,111 @@ const CourseDetail = () => {
       =================================================== */}
       <div className="flex-1 p-6 md:p-8 overflow-y-auto bg-gray-50 scroll-smooth">
         {activeLesson ? (
-          <div className="max-w-5xl mx-auto space-y-8">
+          <div className="max-w-6xl mx-auto space-y-6"> {/* Expanded width for Split View */}
             
-            {/* 1. VIDEO PLAYER */}
-            <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-black/10 relative group">
-              {getYouTubeId(activeLesson.content) ? (
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.content)}`}
-                  title={activeLesson.title}
-                  allowFullScreen
-                  className="w-full h-full border-0"
-                ></iframe>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-900">
-                  <FileText className="w-16 h-16 mb-4 opacity-50" />
-                  <p className="font-medium text-lg text-gray-300">Text-based Lesson</p>
-                </div>
-              )}
+            {/*  TAB SWITCHER */}
+            <div className="flex gap-6 border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('video')}
+                className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+                  activeTab === 'video' 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Video size={18} /> Video Lesson
+              </button>
+              <button
+                onClick={() => setActiveTab('lab')}
+                className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+                  activeTab === 'lab' 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Code size={18} /> Coding Lab & AI
+              </button>
             </div>
 
-            {/* 2. HEADER & CONTROLS */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                   <Video className="w-4 h-4 text-indigo-500" />
-                   <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Video Lesson</span>
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900">{activeLesson.title}</h1>
-              </div>
-              
-              <div className="flex gap-3 w-full md:w-auto">
-                <button
-                  onClick={handleToggleComplete}
-                  disabled={isLessonCompleted(activeLesson.id)}
-                  className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg font-semibold transition-all shadow-sm flex items-center justify-center gap-2
-                    ${isLessonCompleted(activeLesson.id)
-                      ? "bg-green-50 text-green-700 border border-green-200 cursor-default"
-                      : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5"
-                    }`}
-                >
-                  {isLessonCompleted(activeLesson.id) ? (
-                    <>
-                      <Check className="w-4 h-4" /> Completed
-                    </>
+            {/*  CONDITIONAL RENDERING BASED ON TAB */}
+            {activeTab === 'video' ? (
+              // --- 1. VIDEO TAB (Original Content) ---
+              <div className="animate-in fade-in duration-300 space-y-8">
+                {/* VIDEO PLAYER */}
+                <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-black/10 relative group">
+                  {getYouTubeId(activeLesson.content) ? (
+                    <iframe
+                      width="100%" height="100%"
+                      src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.content)}`}
+                      title={activeLesson.title} allowFullScreen className="w-full h-full border-0"
+                    ></iframe>
                   ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" /> Mark Complete
-                    </>
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-900">
+                      <FileText className="w-16 h-16 mb-4 opacity-50" />
+                      <p className="font-medium text-lg text-gray-300">Text-based Lesson</p>
+                    </div>
                   )}
-                </button>
+                </div>
 
-                <button
-                  onClick={() => navigate(`/courses/lessons/${activeLesson.id}/quiz`)}
-                  className="flex-1 md:flex-none px-5 py-2.5 rounded-lg font-semibold bg-white text-gray-700 border border-gray-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 transition-all shadow-sm flex items-center justify-center gap-2 group"
-                >
-                  <FileQuestion className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" /> 
-                  Take Quiz
-                </button>
+                {/* CONTROLS */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">{activeLesson.title}</h1>
+                  </div>
+                  <div className="flex gap-3 w-full md:w-auto">
+                    <button onClick={handleToggleComplete} disabled={isLessonCompleted(activeLesson.id)} 
+                      className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg font-semibold transition-all shadow-sm flex items-center justify-center gap-2 
+                      ${isLessonCompleted(activeLesson.id) ? "bg-green-50 text-green-700 border border-green-200 cursor-default" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}>
+                      {isLessonCompleted(activeLesson.id) ? <><Check className="w-4 h-4" /> Completed</> : <><CheckCircle className="w-4 h-4" /> Mark Complete</>}
+                    </button>
+                    <button onClick={() => navigate(`/courses/lessons/${activeLesson.id}/quiz`)} className="flex-1 md:flex-none px-5 py-2.5 rounded-lg font-semibold bg-white text-gray-700 border border-gray-200 hover:bg-purple-50 hover:text-purple-700 transition-all shadow-sm flex items-center justify-center gap-2 group">
+                      <FileQuestion className="w-4 h-4 text-gray-400 group-hover:text-purple-600" /> Take Quiz
+                    </button>
+                  </div>
+                </div>
+
+                {/* NOTES */}
+                <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200/60 prose prose-indigo max-w-none">
+                   <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4"><FileText className="w-5 h-5 text-gray-400" /> Lesson Notes</h3>
+                   <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{getYouTubeId(activeLesson.content) ? "Watch the video..." : activeLesson.content}</p>
+                </div>
+
+                {/* GRAPH */}
+                {course.prerequisites && course.prerequisites.length > 0 && (
+                  <div className="mt-8"><CourseGraph currentCourse={course} prerequisites={course.prerequisites} /></div>
+                )}
               </div>
-            </div>
-            
-            {/* 3. DESCRIPTION */}
-            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200/60 prose prose-indigo max-w-none">
-               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                 <FileText className="w-5 h-5 text-gray-400" />
-                 Lesson Notes
-               </h3>
-               <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
-                 {getYouTubeId(activeLesson.content) 
-                   ? "Watch the video above to complete this lesson. Once you have finished, mark it as complete to track your progress. If you feel confident, take the quiz to test your knowledge!" 
-                   : activeLesson.content}
-               </p>
-            </div>
+            ) : (
+              // --- 2. LAB TAB (Code + AI) ---
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-2 duration-500 h-[600px]">
+                 {/* LEFT: Code Editor (Takes 2/3 width) */}
+                 <div className="lg:col-span-2 flex flex-col gap-4">
+                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm flex justify-between items-center">
+                       <span className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Code className="w-4 h-4 text-blue-500"/> Python Sandbox</span>
+                       <span className="text-xs text-gray-400">Automated Environment</span>
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <CodeEditor language="python" initialCode={`# Practice code for: ${activeLesson.title}\n\ndef solve():\n    print("Hello Cognito!")\n\nsolve()`} />
+                    </div>
+                 </div>
 
-            {/* 4. PREREQUISITE GRAPH (Conditional Render) */}
-            {course.prerequisites && course.prerequisites.length > 0 && (
-              <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="bg-indigo-100 p-1.5 rounded text-indigo-600">
-                    <GitMerge className="w-5 h-5" />
-                  </span>
-                  Learning Path
-                </h3>
-                <CourseGraph 
-                  currentCourse={course} 
-                  prerequisites={course.prerequisites} 
-                />
+                 {/* RIGHT: AI Tutor (Takes 1/3 width) */}
+                 <div className="flex flex-col gap-4">
+                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm flex justify-between items-center">
+                       <span className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Sparkles className="w-4 h-4 text-yellow-500"/> AI Tutor</span>
+                       <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Online</span>
+                    </div>
+                    <div className="flex-1 min-h-0">
+                       <AiTutor courseId={course.id} />
+                    </div>
+                 </div>
               </div>
             )}
 
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <div className="w-16 h-16 bg-gray-200 rounded-full mb-4 flex items-center justify-center animate-pulse">
-               <PlayCircle className="w-8 h-8 text-gray-400" />
-            </div>
+            <div className="w-16 h-16 bg-gray-200 rounded-full mb-4 flex items-center justify-center animate-pulse"><PlayCircle className="w-8 h-8 text-gray-400" /></div>
             <p className="text-lg font-medium">Select a lesson to start learning</p>
           </div>
         )}

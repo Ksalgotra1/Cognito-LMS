@@ -11,3 +11,10 @@ export const fetchCourseById = async (id) => {
   const response = await client.get(`api/courses/${id}/`);
   return response.data;
 };
+
+//  AI RAG Endpoint
+export const askAiTutor = async (courseId, question) => {
+  // Matches the backend view: AskAIView
+  const response = await client.post(`api/courses/${courseId}/ask/`, { question });
+  return response.data;
+};

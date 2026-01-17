@@ -157,6 +157,18 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
+# REDIS CACHE CONFIGURATION
+# Used for: Search Engine Trie & AI RAG Context
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 # The URL of  server 
 # For now, it is localhost.
 SITE_URL = "http://127.0.0.1:8000"

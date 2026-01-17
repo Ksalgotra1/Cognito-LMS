@@ -27,6 +27,10 @@ from .utils import generate_study_schedule
 from django.utils import timezone
 import datetime
 
+# --- SERVICE IMPORTS ---
+from .services import get_or_create_course_context
+import random # For the mock response
+
 # --- Course Views ---
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -49,6 +53,19 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def retrieve(self, request, *args, **kwargs):
+        # 1. Standard retrieval logic
+        instance = self.get_object()
+        
+        # 2.  TRIGGER LAZY LOAD 
+        # This calculates the DAG and puts it in Redis NOW.
+        # So when the user opens the "Code Lab" 5 seconds later, 
+        # the AI context is already waiting in RAM.
+        get_or_create_course_context(instance.id)
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 # --- STUDENT ANALYTICS DASHBOARD ---
@@ -486,3 +503,43 @@ class GenerateStudyPlanView(APIView):
         )
         
         return Response(plan.generated_schedule, status=status.HTTP_200_OK)
+    
+# --- Ask AI ---
+class AskAIView(APIView):
+    """
+    RAG Endpoint: Accepts a question, fetches Redis context, and answers.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, course_id):
+        user_question = request.data.get('question')
+        if not user_question:
+            return Response({"error": "Question is required"}, status=400)
+
+        # 1. ⚡ GET CONTEXT (Instant from Redis)
+        context = get_or_create_course_context(course_id)
+        if not context:
+            return Response({"error": "Course not found"}, status=404)
+
+        # 2. CONSTRUCT PROMPT (The "RAG" part)
+        # This is what we WOULD send to OpenAI/Gemini
+        system_prompt = f"""
+        You are a tutor for: "{context['title']}".
+        Context: It builds on {", ".join(context['parents'])} and {", ".join(context['grandparents'])}.
+        Question: {user_question}
+        """
+
+        # 3. MOCK RESPONSE (Simulating AI for now)
+        mock_answers = [
+            f"That's a great question about {context['title']}! Since you know {context['parents'][0] if context['parents'] else 'the basics'}, think of it like an extension of that concept.",
+            f"Based on your background in {', '.join(context['grandparents'])}, this is actually a similar pattern used for optimization.",
+            "Here is a code snippet that might help explain it: \n```python\ndef explain():\n    return 'Simple!'\n```"
+        ]
+        
+        return Response({
+            "answer": random.choice(mock_answers),
+            "context_used": {
+                "course": context['title'],
+                "prereqs": context['parents']
+            }
+        })
