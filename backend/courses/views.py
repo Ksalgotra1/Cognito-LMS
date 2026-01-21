@@ -28,7 +28,8 @@ from django.utils import timezone
 import datetime
 
 # --- SERVICE IMPORTS ---
-from .services import get_or_create_course_context
+from .services import get_rag_context
+import time
 import random # For the mock response
 
 # --- Course Views ---
@@ -59,10 +60,8 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         
         # 2.  TRIGGER LAZY LOAD 
-        # This calculates the DAG and puts it in Redis NOW.
-        # So when the user opens the "Code Lab" 5 seconds later, 
-        # the AI context is already waiting in RAM.
-        get_or_create_course_context(instance.id)
+        # The AI context is now generated dynamically in AskAIView, 
+        # so we don't need to pre-load it here anymore.
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
@@ -507,7 +506,8 @@ class GenerateStudyPlanView(APIView):
 # --- Ask AI ---
 class AskAIView(APIView):
     """
-    RAG Endpoint: Accepts a question, fetches Redis context, and answers.
+    Context-Aware AI Endpoint.
+    Injects User Progress + DAG Graph into the prompt.
     """
     permission_classes = [IsAuthenticated]
 
@@ -516,30 +516,33 @@ class AskAIView(APIView):
         if not user_question:
             return Response({"error": "Question is required"}, status=400)
 
-        # 1. ⚡ GET CONTEXT (Instant from Redis)
-        context = get_or_create_course_context(course_id)
-        if not context:
-            return Response({"error": "Course not found"}, status=404)
+        # 1. 🧠 BUILD THE BRAIN (Get Context)
+        # We pass 'request.user' so we can look up their specific progress
+        system_prompt = get_rag_context(course_id, request.user)
 
-        # 2. CONSTRUCT PROMPT (The "RAG" part)
-        # This is what we WOULD send to OpenAI/Gemini
-        system_prompt = f"""
-        You are a tutor for: "{context['title']}".
-        Context: It builds on {", ".join(context['parents'])} and {", ".join(context['grandparents'])}.
-        Question: {user_question}
-        """
-
-        # 3. MOCK RESPONSE (Simulating AI for now)
-        mock_answers = [
-            f"That's a great question about {context['title']}! Since you know {context['parents'][0] if context['parents'] else 'the basics'}, think of it like an extension of that concept.",
-            f"Based on your background in {', '.join(context['grandparents'])}, this is actually a similar pattern used for optimization.",
-            "Here is a code snippet that might help explain it: \n```python\ndef explain():\n    return 'Simple!'\n```"
-        ]
+        # 2. ⚡ SIMULATE LLM CALL
+        # In production, you would do:
+        # response = openai.ChatCompletion.create(
+        #    model="gpt-4",
+        #    messages=[
+        #       {"role": "system", "content": system_prompt},
+        #       {"role": "user", "content": user_question}
+        #    ]
+        # )
         
+        # For now, we print the prompt to the console so you can Verify it works
+        print(f"\n--- 🧠 AI CONTEXT GENERATED ---\n{system_prompt}\n-------------------------------\n")
+        
+        # Simulate thinking time
+        time.sleep(1.5)
+
+        # Mock Response based on context presence
+        if "STUDENT HISTORY" in system_prompt and "completed" in system_prompt:
+             ai_answer = f"Since you've already learned about those previous topics, this concept is just an extension. {user_question} is solved by..."
+        else:
+             ai_answer = f"That is a great question! Since you are new to this course, let's start with the basics. {user_question} is..."
+
         return Response({
-            "answer": random.choice(mock_answers),
-            "context_used": {
-                "course": context['title'],
-                "prereqs": context['parents']
-            }
+            "answer": ai_answer,
+            "context_debug": system_prompt[:200] + "..." # Send back a snippet for debugging
         })

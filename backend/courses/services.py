@@ -1,51 +1,53 @@
-import pickle
 from django.core.cache import cache
-from .models import Course
+from .models import Course, Lesson, UserProgress
 
-def get_or_create_course_context(course_id):
+def get_rag_context(course_id, user):
     """
-    Retrieves the AI Context (Title, Parents, Grandparents) for a course.
-    1. Checks Redis.
-    2. If miss, calculates from DB and saves to Redis (1 hour timeout).
+    Builds a dynamic 'System Prompt' for the AI based on:
+    1. The Course's Position in the DAG (The Map).
+    2. The User's Completed Lessons (The History).
     """
-    cache_key = f"course_context_{course_id}"
-    
-    # 1. Check Redis (Fast Path)
     try:
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            # We use pickle because we are storing a Python Dictionary, not just a string
-            return pickle.loads(cached_data)
-    except Exception:
-        pass # Fallback to DB if Redis hiccups
+        course = Course.objects.prefetch_related('prerequisites').get(id=course_id)
+        
+        # --- PART 1: THE MAP (DAG Structure) ---
+        # We try to fetch the full graph from Redis, otherwise fallback to direct DB parents
+        dag_context = "CONTEXT: This is a standalone course."
+        
+        # Check specific prerequisites (Immediate Parents)
+        parents = list(course.prerequisites.all())
+        if parents:
+            parent_names = ", ".join([p.title for p in parents])
+            dag_context = f"CONTEXT: This course builds upon concepts from: {parent_names}. If the student is confused, use analogies from these subjects."
 
-    # 2. Calculate from DB (Slow Path)
-    try:
-        # Optimized: Fetch Course + Parents + Grandparents in 1 query
-        course = Course.objects.prefetch_related('prerequisites__prerequisites').get(id=course_id)
+        # --- PART 2: THE HISTORY (User Progress) ---
+        # What has the student actually finished in THIS course?
+        completed_lessons = UserProgress.objects.filter(
+            user=user,
+            lesson__module__course=course,
+            is_completed=True
+        ).select_related('lesson')
+        
+        if completed_lessons.exists():
+            # We list the titles of completed lessons to give the AI "Memory"
+            past_topics = ", ".join([p.lesson.title for p in completed_lessons])
+            history_context = f"STUDENT HISTORY: The student has already completed: {past_topics}. You can reference these concepts."
+        else:
+            history_context = "STUDENT HISTORY: The student is just starting this course. Keep explanations foundational."
+
+        # --- PART 3: ASSEMBLE ---
+        full_system_prompt = f"""
+        ROLE: You are an expert AI Tutor for the course '{course.title}'.
+        {dag_context}
+        {history_context}
+        
+        INSTRUCTIONS:
+        1. Answer the student's question efficiently.
+        2. IF ASKED FOR AN EXERCISE: Generate a short, practical coding challenge or conceptual question.
+           - Use the 'Student History' to ensure the difficulty is appropriate.
+           - If they know {parents[0].title if parents else 'basics'}, try to combine that with the current topic.
+        """
+        return full_system_prompt
+
     except Course.DoesNotExist:
-        return None
-
-    # Logic: Flatten the dependency tree into text for the AI
-    parents = list(course.prerequisites.all())
-    grandparents = set()
-    for parent in parents:
-        for gp in parent.prerequisites.all():
-            grandparents.add(gp)
-
-    context_data = {
-        "id": course.id,
-        "title": course.title,
-        "description": course.description[:500], # Limit description length for AI token savings
-        "parents": [p.title for p in parents],
-        "grandparents": [gp.title for gp in grandparents]
-    }
-
-    # 3. Save to Redis
-    try:
-        # Expires in 1 hour (3600s)
-        cache.set(cache_key, pickle.dumps(context_data), timeout=3600)
-    except Exception:
-        pass
-
-    return context_data
+        return "System Error: Course context missing."
