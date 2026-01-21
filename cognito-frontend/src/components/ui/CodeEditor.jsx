@@ -10,19 +10,46 @@ const CodeEditor = ({
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
 
-  // --- MOCK RUN FUNCTION ---
-  // Later, we will replace this with an API call to Piston/Docker
-  const handleRun = () => {
+  // (Piston API)
+  const handleRun = async () => {
     setIsRunning(true);
-    setOutput(""); // Clear previous output
+    setOutput(""); // Clear old output
 
-    setTimeout(() => {
-      // Simulating a Python execution response
-      setOutput(
-        `> python3 main.py\n\nHello Cognito!\n[System] Process finished with exit code 0`
-      );
+    try {
+      // 1. Send code to Piston API (Public Execution Engine)
+      const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: language, // e.g., "python"
+          version: "3.10.0",  // Piston supports specific versions
+          files: [
+            {
+              name: "main.py",
+              content: code
+            }
+          ]
+        })
+      });
+
+      // 2. Parse the result
+      const data = await response.json();
+
+      // 3. Display Output
+      if (data.run) {
+        // stdout = Print statements | stderr = Errors
+        // We handle both so the user sees errors if their code fails
+        const result = data.run.stdout || data.run.stderr || "Process finished with no output.";
+        setOutput(result);
+      } else {
+        setOutput("Error: Could not communicate with the execution engine.");
+      }
+
+    } catch (error) {
+      setOutput(`System Error: ${error.message}`);
+    } finally {
       setIsRunning(false);
-    }, 1000); // 1-second fake delay
+    }
   };
 
   return (

@@ -12,3 +12,4 @@ export const registerUser = async (userData) => {
   const response = await client.post('api/register/', userData);
   return response.data;
 };
+
