@@ -1,132 +1,138 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useDebounce } from '../../hooks/useDebounce';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Loader2, BookOpen, FileVideo, X } from 'lucide-react'; // ✨ New Icons
+import axios from 'axios';
+import { Search, Loader2, BookOpen, FileVideo, Brain, Zap } from 'lucide-react';
 
 const SearchBar = () => {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false); // To toggle dropdown visibility
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    
+    const navigate = useNavigate();
+    const wrapperRef = useRef(null);
 
-  const debouncedQuery = useDebounce(query, 300);
-  const navigate = useNavigate();
+    // 1. Close Dropdown on Click Outside
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [wrapperRef]);
 
-  useEffect(() => {
-    if (debouncedQuery.length < 2) {
-      setResults([]);
-      setIsOpen(false);
-      return;
-    }
+    // 2. Hybrid Search Logic (Debounced)
+    useEffect(() => {
+        let isCancelled = false;
+        
+        // Wait 800ms to avoid overloading your local Llama 3
+        const delayDebounceFn = setTimeout(async () => {
+            if (query.trim().length < 2) {
+                setResults([]);
+                return;
+            }
 
-    const fetchResults = async () => {
-      setIsLoading(true);
-      setIsOpen(true);
-      try {
-        const response = await axios.get(`http://127.0.0.1:8000/api/courses/search/?q=${debouncedQuery}`);
-        setResults(response.data);
-      } catch (error) {
-        console.error("Search failed:", error);
-      } finally {
-        setIsLoading(false);
-      }
+            setIsLoading(true);
+            setShowDropdown(true);
+
+            try {
+                const response = await axios.get(`http://127.0.0.1:8000/api/courses/search/?q=${query}`);
+                if (!isCancelled) setResults(response.data);
+            } catch (error) {
+                console.error("Search Error:", error);
+                if (!isCancelled) setResults([]);
+            } finally {
+                if (!isCancelled) setIsLoading(false);
+            }
+        }, 800); 
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(delayDebounceFn);
+        };
+    }, [query]);
+
+    const handleSelect = (url) => {
+        navigate(url);
+        setShowDropdown(false);
+        setQuery('');
     };
 
-    fetchResults();
-  }, [debouncedQuery]);
-
-  // Helper to handle navigation
-  const handleSelect = (url) => {
-    navigate(url);
-    setQuery('');
-    setIsOpen(false);
-  };
-
-  return (
-    <div className="relative w-full max-w-2xl mx-auto font-sans">
-      
-      {/* --- Search Input Field --- */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-        </div>
-        
-        <input
-          type="text"
-          className="block w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ease-in-out shadow-sm"
-          placeholder="Search for courses, lessons..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => { if(results.length > 0) setIsOpen(true) }}
-          // Close dropdown on blur (delayed to allow clicks)
-          onBlur={() => setTimeout(() => setIsOpen(false), 200)} 
-        />
-
-        {/* Right Side Icons (Loading or Clear) */}
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-          {isLoading ? (
-            <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-          ) : query ? (
-             <button onClick={() => setQuery('')} className="text-gray-400 hover:text-gray-600">
-               <X className="h-4 w-4" />
-             </button>
-          ) : (
-            <kbd className="hidden sm:inline-block px-2 py-0.5 text-xs font-medium text-gray-400 bg-gray-100 border border-gray-200 rounded-md">
-              ⌘K
-            </kbd>
-          )}
-        </div>
-      </div>
-
-      {/* --- Dropdown Results --- */}
-      {isOpen && (results.length > 0 || query.length > 1) && (
-        <div className="absolute z-50 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden ring-1 ring-black ring-opacity-5 transition-all">
-          
-          {/* Header */}
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            {results.length} results found
-          </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            {results.length > 0 ? (
-              results.map((item) => (
-                <div
-                  key={`${item.type}-${item.id}`}
-                  onClick={() => handleSelect(item.url)}
-                  className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors group border-b border-gray-50 last:border-none"
-                >
-                  {/* Icon Badge */}
-                  <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center ${
-                    item.type === 'course' ? 'bg-indigo-100 text-indigo-600' : 'bg-teal-100 text-teal-600'
-                  }`}>
-                    {item.type === 'course' ? <BookOpen className="h-5 w-5" /> : <FileVideo className="h-5 w-5" />}
-                  </div>
-
-                  {/* Text Content */}
-                  <div className="ml-4 flex-1">
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-700">
-                      {item.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {item.type === 'lesson' ? `In: ${item.course}` : 'Full Course'}
-                    </p>
-                  </div>
+    return (
+        <div ref={wrapperRef} className="relative w-full max-w-2xl mx-auto z-50">
+            {/* Input Field */}
+            <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                 </div>
-              ))
-            ) : (
-              // Empty State
-              !isLoading && (
-                <div className="px-4 py-8 text-center text-gray-500">
-                  <p className="text-sm">No results found for "{query}"</p>
+                <input
+                    type="text"
+                    className="block w-full pl-12 pr-12 py-4 bg-[#1e1e1e] border border-gray-700 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg"
+                    placeholder="Search 'React' (Fast) or 'how to center div' (Smart)..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
+                />
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                    {isLoading && <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />}
                 </div>
-              )
+            </div>
+
+            {/* Dropdown Results */}
+            {showDropdown && results.length > 0 && (
+                <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-gray-800 rounded-xl shadow-2xl overflow-hidden">
+                    <ul className="max-h-96 overflow-y-auto custom-scrollbar">
+                        {results.map((item, idx) => (
+                            <li key={`${item.type}-${item.id}-${idx}`} className="border-b border-gray-800/50 last:border-0">
+                                <button
+                                    onClick={() => handleSelect(item.url)}
+                                    className="w-full text-left px-5 py-4 hover:bg-[#252525] transition-colors flex items-start gap-4 group"
+                                >
+                                    {/* ICON LOGIC: Brain vs Book vs Video */}
+                                    <div className={`p-3 rounded-lg shrink-0 mt-0.5 
+                                        ${item.source === 'ai_semantic' ? 'bg-purple-500/10 text-purple-400' : 
+                                          item.type === 'course' ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'}`
+                                    }>
+                                        {item.source === 'ai_semantic' ? <Brain size={20} /> : 
+                                         item.type === 'course' ? <BookOpen size={20} /> : <FileVideo size={20} />}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h4 className="font-semibold text-gray-200 group-hover:text-white truncate">
+                                                {item.title}
+                                            </h4>
+                                            {/* AI Badge */}
+                                            {item.source === 'ai_semantic' && (
+                                                <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-2 rounded-full">
+                                                    AI Match
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        {/* CONTEXT LINE: Shows "In: Course Name" */}
+                                        <p className="text-sm text-gray-500 truncate">
+                                            {item.type === 'lesson' && item.course_title 
+                                                ? <span className="text-gray-400">In: {item.course_title}</span> 
+                                                : item.description || "Course Overview"
+                                            }
+                                        </p>
+                                    </div>
+                                    
+                                    {/* Lightning Bolt for Trie matches */}
+                                    <div className="text-gray-600">
+                                         {item.source === 'trie_fast' && <Zap size={14} className="opacity-50" />}
+                                    </div>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
-          </div>
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 export default SearchBar;

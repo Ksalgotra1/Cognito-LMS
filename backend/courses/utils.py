@@ -1,17 +1,75 @@
 import datetime
+from datetime import timedelta
+
+# ==========================================
+#  PART 1: THE SEARCH ENGINE (Trie)
+# ==========================================
+# This logic was previously in trie.py. We moved it here so apps.py can find it easily.
+
+class TrieNode:
+    """
+    A single node in the Trie (Prefix Tree).
+    Optimized with __slots__ to save RAM.
+    """
+    __slots__ = ['children', 'is_end_of_word', 'data']
+
+    def __init__(self):
+        self.children = {}
+        self.is_end_of_word = False
+        self.data = []  # Stores the full payload (id, title, url, type)
+
+class CourseTrie:
+    """
+    The In-Memory Index for 0ms search.
+    """
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, text, item_data):
+        node = self.root
+        clean_text = text.lower().strip()
+        
+        for char in clean_text:
+            if char not in node.children:
+                node.children[char] = TrieNode()
+            node = node.children[char]
+        
+        node.is_end_of_word = True
+        node.data.append(item_data)
+
+    def search(self, prefix):
+        node = self.root
+        clean_prefix = prefix.lower().strip()
+
+        # 1. Traverse down to the prefix
+        for char in clean_prefix:
+            if char not in node.children:
+                return [] 
+            node = node.children[char]
+        
+        # 2. Collect everything below this node
+        return self._collect_all(node)
+
+    def _collect_all(self, node):
+        results = []
+        if node.is_end_of_word:
+            results.extend(node.data)
+        
+        for char in node.children:
+            results.extend(self._collect_all(node.children[char]))
+        
+        return results
+
+
+# ==========================================
+#  PART 2: THE STUDY SCHEDULER (Algorithm)
+# ==========================================
+# This logic handles the "Generate Study Plan" feature.
 
 def generate_study_schedule(start_date, target_date, weekly_availability, lessons):
     """
     Allocates lessons into time slots based on user availability.
-    
-    Args:
-        start_date (date): When the user wants to start.
-        target_date (date): The deadline.
-        weekly_availability (dict): e.g., {"Mon": 60, "Tue": 0, "Wed": 120...} (Minutes per day)
-        lessons (queryset): Ordered list of Lesson objects.
-
-    Returns:
-        list: A JSON-serializable schedule [{"date": "2023-10-01", "lessons": [...]}, ...]
+    Greedy First-Fit Algorithm.
     """
     schedule = []
     
@@ -20,15 +78,14 @@ def generate_study_schedule(start_date, target_date, weekly_availability, lesson
     lesson_idx = 0
     total_lessons = len(lessons)
     
-    # 2. The Allocation Loop (Greedy First-Fit Algorithm)
-    # We loop day-by-day until we run out of lessons OR hit the safety limit (365 days)
+    # 2. The Allocation Loop
     while lesson_idx < total_lessons:
         
-        # Safety Break: Don't schedule past 1 year (infinite loop protection)
+        # Safety Break: Don't schedule past 1 year
         if (current_date - start_date).days > 365:
             break
 
-        # A. Get availability for this day of the week (e.g., "Mon")
+        # A. Get availability for this day
         day_name = current_date.strftime("%a") # "Mon", "Tue"...
         minutes_available = weekly_availability.get(day_name, 0)
         
@@ -40,14 +97,14 @@ def generate_study_schedule(start_date, target_date, weekly_availability, lesson
         
         time_used_today = 0
         
-        # B. Try to fit as many lessons as possible into TODAY
+        # B. Try to fit lessons into TODAY
         while lesson_idx < total_lessons:
             lesson = lessons[lesson_idx]
-            duration = lesson.duration_minutes
+            # Default to 30 mins if duration is missing
+            duration = lesson.duration_minutes if lesson.duration_minutes else 30
             
-            # Check Constraint: Do we have enough time left today?
+            # Check Constraint
             if time_used_today + duration <= minutes_available:
-                # ALLOCATE!
                 daily_plan["lessons"].append({
                     "title": lesson.title,
                     "duration": duration,
@@ -56,14 +113,13 @@ def generate_study_schedule(start_date, target_date, weekly_availability, lesson
                 time_used_today += duration
                 lesson_idx += 1
             else:
-                # Day is full! Stop filling today.
-                break
+                break # Day is full
         
-        # C. Only add the day to the schedule if we actually scheduled something
+        # C. Add day to schedule
         if daily_plan["lessons"]:
             schedule.append(daily_plan)
         
-        # D. Move to next day
+        # D. Next day
         current_date += datetime.timedelta(days=1)
 
     return schedule

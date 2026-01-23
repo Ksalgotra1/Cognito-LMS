@@ -32,6 +32,11 @@ from .services import get_rag_context
 import time
 import random # For the mock response
 
+# --- AI CONTEXT IMPORTS ---
+import json
+from django.db.models import Q # <--- Add this
+from .ai_client import get_chat_response, get_search_keywords # <--- Add this
+
 # --- Course Views ---
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -421,39 +426,82 @@ class CertificateVerifyView(generics.RetrieveAPIView):
     lookup_field = 'certificate_id' 
 
 
-# --- High Performance Search (Trie) ---
+# --- HYBRID SEARCH ---
 
 def search_content(request):
     """
-    High-Performance Search Endpoint (Trie-Based).
-    
-    Architecture:
-    - Instead of hitting the database with a slow SQL LIKE query, 
-    - this view queries the In-Memory Trie stored in the AppConfig.
-    - Response time is typically < 5ms (O(k) complexity).
+    Unified Hybrid Search.
+    Layer 1 (RAM): Queries Trie for Courses + Lessons instantly.
+    Layer 2 (AI): Fallback to Llama 3 -> Queries DB for Courses + Lessons.
     """
-    query = request.GET.get('q', '')
+    query = request.GET.get('q', '').strip()
+    if not query: return JsonResponse([], safe=False)
+
+    results = []
     
-    # Return empty list for empty queries
-    if not query:
+    # --- LAYER 1: TRIE (Fast RAM Search) ---
+    try:
+        trie = apps.get_app_config('courses').trie
+        if trie:
+            trie_results = trie.search(query)
+            if trie_results:
+                # Add source tag and return immediately
+                for r in trie_results:
+                    r_copy = r.copy() 
+                    r_copy['source'] = 'trie_fast' # ⚡️ Icon
+                    results.append(r_copy)
+                return JsonResponse(results[:10], safe=False)
+    except Exception as e:
+        print(f"⚠️ Trie Error: {e}")
+
+    # --- LAYER 2: AI FALLBACK (Llama 3) ---
+    print(f"⚠️ Trie failed for '{query}'. Engaging Llama 3...")
+    
+    keywords = get_search_keywords(query)
+    print(f"🦙 [AI Reasoning] Mapped '{query}' -> {keywords}")
+
+    if not keywords:
         return JsonResponse([], safe=False)
 
-    try:
-        # Access the global Trie instance initialized in apps.py
-        trie = apps.get_app_config('courses').trie
-        
-        # Safety check: If server didn't initialize correctly
-        if not trie:
-            return JsonResponse({"error": "Search engine not ready"}, status=503)
+    # Build Logic: Title OR Description matches keywords
+    q_lookup = Q()
+    for k in keywords:
+        q_lookup |= Q(title__icontains=k) | Q(description__icontains=k)
 
-        # Perform the O(k) search
-        results = trie.search(query)
-        
-        # Limit to top 10 results to keep the payload light
-        return JsonResponse(results[:10], safe=False)
-        
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    # A. Search Courses (Top 3)
+    ai_courses = Course.objects.filter(q_lookup).distinct()[:3]
+    for c in ai_courses:
+        results.append({
+            "id": c.id,
+            "title": c.title,
+            "type": "course",
+            "course_title": None,
+            "url": f"/courses/{c.id}",
+            "source": "ai_semantic", # 🧠 Icon
+            "description": c.description
+        })
+
+    # B. Search Lessons (Fill remaining slots)
+    if len(results) < 5:
+        # For lessons, we just check if Title contains the keyword
+        q_lesson = Q()
+        for k in keywords:
+            q_lesson |= Q(title__icontains=k)
+            
+        ai_lessons = Lesson.objects.filter(q_lesson).select_related('module__course')[:5]
+        for l in ai_lessons:
+            # We add it even if duplicate, relying on ID to be unique in frontend
+            results.append({
+                "id": l.id,
+                "title": l.title,
+                "type": "lesson",
+                "course_title": f"AI Match in {l.module.course.title}",
+                "url": f"/courses/{l.module.course.id}", # Link to course
+                "source": "ai_semantic",
+                "description": None
+            })
+
+    return JsonResponse(results[:10], safe=False)
 
 
 # --- Study Plan Scheduler (Algorithmic) ---
@@ -506,8 +554,10 @@ class GenerateStudyPlanView(APIView):
 # --- Ask AI ---
 class AskAIView(APIView):
     """
-    Context-Aware AI Endpoint.
-    Injects User Progress + DAG Graph into the prompt.
+    The Real AI Tutor Endpoint.
+    1. Builds Context (DAG + History)
+    2. Sends to Llama 3
+    3. Returns real answer
     """
     permission_classes = [IsAuthenticated]
 
@@ -516,33 +566,17 @@ class AskAIView(APIView):
         if not user_question:
             return Response({"error": "Question is required"}, status=400)
 
-        # 1. 🧠 BUILD THE BRAIN (Get Context)
-        # We pass 'request.user' so we can look up their specific progress
+        # 1.  BUILD THE BRAIN (Get RAG Context)
         system_prompt = get_rag_context(course_id, request.user)
-
-        # 2. ⚡ SIMULATE LLM CALL
-        # In production, you would do:
-        # response = openai.ChatCompletion.create(
-        #    model="gpt-4",
-        #    messages=[
-        #       {"role": "system", "content": system_prompt},
-        #       {"role": "user", "content": user_question}
-        #    ]
-        # )
         
-        # For now, we print the prompt to the console so you can Verify it works
-        print(f"\n--- 🧠 AI CONTEXT GENERATED ---\n{system_prompt}\n-------------------------------\n")
-        
-        # Simulate thinking time
-        time.sleep(1.5)
+        # Debugging: Print to console so you can see what the AI "knows"
+        print(f"\n--- 🧠 CONTEXT FOR LLAMA 3 ---\n{system_prompt}\n-------------------------------\n")
 
-        # Mock Response based on context presence
-        if "STUDENT HISTORY" in system_prompt and "completed" in system_prompt:
-             ai_answer = f"Since you've already learned about those previous topics, this concept is just an extension. {user_question} is solved by..."
-        else:
-             ai_answer = f"That is a great question! Since you are new to this course, let's start with the basics. {user_question} is..."
+        # 2. ⚡ CALL LLAMA 3 
+        # This will take 2-5 seconds locally
+        ai_answer = get_chat_response(system_prompt, user_question)
 
         return Response({
             "answer": ai_answer,
-            "context_debug": system_prompt[:200] + "..." # Send back a snippet for debugging
+            "context_debug": system_prompt # Optional: send back if you want to inspect in Frontend
         })

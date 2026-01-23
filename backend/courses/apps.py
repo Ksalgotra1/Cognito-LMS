@@ -10,7 +10,7 @@ class CoursesConfig(AppConfig):
     trie = None
 
     def ready(self):
-        # 1. Server Check (Prevents double loading)
+        # 1. Server Check (Prevents double loading/reloader issues)
         if os.environ.get('RUN_MAIN', None) != 'true':
             return
 
@@ -19,39 +19,50 @@ class CoursesConfig(AppConfig):
             return
 
         from .models import Course, Lesson
-        # ✅ FIX: Import 'CourseTrie' (which is what you named it in trie.py)
-        from .trie import CourseTrie 
+        # Assuming you put the Trie class in utils.py (as per previous steps). 
+        # If it's in trie.py, keep it as .trie
+        from .utils import CourseTrie 
 
-        print("🔍 [Search Engine] Building In-Memory Index...")
+        print("⚡ [Search Engine] Building In-Memory Trie...")
         
         # Initialize
-        CoursesConfig.trie = CourseTrie()
+        self.trie = CourseTrie()
 
         # 3. Index COURSES
-        courses = Course.objects.all().values('id', 'title')
+        # We fetch description too, so the frontend can show it
+        courses = Course.objects.all()
         for course in courses:
-            CoursesConfig.trie.insert(course['title'], { 
-                'id': course['id'],
-                'type': 'course',
-                'title': course['title'],
-                'url': f"/courses/{course['id']}"
-            })
+            payload = {
+                "id": course.id,
+                "title": course.title,
+                "type": "course",
+                "course_title": None, # It is a course
+                "url": f"/courses/{course.id}",
+                "description": course.description,
+                "source": "trie_fast" # Default source tag
+            }
+            self.trie.insert(course.title, payload)
 
-        # 4. Index LESSONS
-        lessons = Lesson.objects.all().values('id', 'title', 'module__course__title', 'module__course__id')
+        # 4. Index LESSONS (The Context!)
+        # select_related is CRITICAL here for performance
+        lessons = Lesson.objects.select_related('module__course').all()
         
         for lesson in lessons:
-            if lesson['module__course__id']: 
-                CoursesConfig.trie.insert(lesson['title'], {
-                    'id': lesson['id'],
-                    'type': 'lesson',
-                    'title': lesson['title'],
+            # Safety check if lesson has a course
+            if lesson.module.course:
+                payload = {
+                    "id": lesson.id,
+                    "title": lesson.title,
+                    "type": "lesson",
                     
-                    # ✅ THE FIX: We add 'course' because your Frontend asks for item.course
-                    'course': lesson['module__course__title'], 
+                    # This matches {item.course_title} in SearchBar.jsx
+                    "course_title": lesson.module.course.title, 
                     
-                    'course_title': lesson['module__course__title'], # Keeping this as backup
-                    'url': f"/courses/{lesson['module__course__id']}"
-                })
+                    # We link to the PARENT COURSE, not the lesson itself (simpler nav)
+                    "url": f"/courses/{lesson.module.course.id}",
+                    "description": None,
+                    "source": "trie_fast"
+                }
+                self.trie.insert(lesson.title, payload)
             
-        print(f"✅ [Search Engine] Indexed {len(courses)} Courses and {len(lessons)} Lessons.")
+        print(f"✅ [Search Engine] Indexed {len(courses)} Courses and {len(lessons)} Lessons into RAM.")
