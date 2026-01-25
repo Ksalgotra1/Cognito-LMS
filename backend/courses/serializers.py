@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Course, Module, Lesson, UserProgress, Question, Choice, Certificate  
 
-
 class LessonSerializer(serializers.ModelSerializer):
     is_completed = serializers.SerializerMethodField() 
 
@@ -13,6 +12,8 @@ class LessonSerializer(serializers.ModelSerializer):
     def get_is_completed(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Note: This runs one query per lesson. 
+            # For strict optimization in lists, consider pre-fetching UserProgress in the View.
             return UserProgress.objects.filter(user=request.user, lesson=obj, is_completed=True).exists()
         return False
 
@@ -70,13 +71,15 @@ class CourseSerializer(serializers.ModelSerializer):
         return round((completed_lessons / total_lessons) * 100)
     
     def get_prerequisites(self, obj):
-        # Keeps existing functionality for simple lists
-        return obj.prerequisites.values('id', 'title')
+        # OPTIMIZATION: We use list comprehension instead of .values()
+        # This ensures we use the pre-fetched objects from memory (prefetch_related)
+        # instead of hitting the DB again.
+        return [{'id': p.id, 'title': p.title} for p in obj.prerequisites.all()]
 
     # ✅ NEW: The Logic for the Graph
     def get_recursive_prerequisites(self, obj):
         """
-        Returns a nested list:
+        Returns a nested list for the DAG Graph:
         [
           { 
             id: 1, title: 'Parent', 
@@ -85,6 +88,7 @@ class CourseSerializer(serializers.ModelSerializer):
         ]
         """
         tree = []
+        # Uses .all() to leverage the 'prefetch_related' from the View
         for parent in obj.prerequisites.all():
             parent_data = {
                 'id': parent.id,
@@ -92,6 +96,7 @@ class CourseSerializer(serializers.ModelSerializer):
                 'prerequisites': [] 
             }
             # Fetch the Grandparents (Prerequisites of the Prerequisite)
+            # This is 0 DB hits if 'prerequisites__prerequisites' was pre-fetched
             for grandparent in parent.prerequisites.all():
                 parent_data['prerequisites'].append({
                     'id': grandparent.id,
@@ -103,7 +108,7 @@ class CourseSerializer(serializers.ModelSerializer):
 class ChoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Choice
-        #  SECURITY ALERT: We DO NOT include 'is_correct' here.
+        # SECURITY ALERT: We DO NOT include 'is_correct' here.
         # If we did, students could see the answers in the JSON!
         fields = ['id', 'text']
 

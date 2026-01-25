@@ -64,10 +64,19 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
         # 1. Standard retrieval logic
         instance = self.get_object()
         
-        # 2.  TRIGGER LAZY LOAD 
-        # The AI context is now generated dynamically in AskAIView, 
-        # so we don't need to pre-load it here anymore.
+        # 2. 🔥 CACHE WARMER (Predictive Loading) 🔥
+        # We force the "Heavy Lifting" (Grandparent DAG calculation) to happen 
+        # right now, while the user is reading the course title.
+        # By the time they click "Ask AI", the data is already waiting in Redis RAM.
+        try:
+            # We wrap this in try/pass so that if Redis fails, the page still loads!
+            get_rag_context(instance.id, request.user)
+            print(f"🔥 [Cache Warmer] Pre-loaded DAG for Course {instance.id}")
+        except Exception as e:
+            # Silently fail. The user shouldn't see an error just because the cache warmer tripped.
+            pass
 
+        # 3. Return the page data
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
