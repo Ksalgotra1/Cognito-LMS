@@ -19,8 +19,6 @@ class CoursesConfig(AppConfig):
             return
 
         from .models import Course, Lesson
-        # Assuming you put the Trie class in utils.py (as per previous steps). 
-        # If it's in trie.py, keep it as .trie
         from .utils import CourseTrie 
 
         print("⚡ [Search Engine] Building In-Memory Trie...")
