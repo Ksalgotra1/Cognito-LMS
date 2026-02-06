@@ -6,6 +6,7 @@ import { Play, BookOpen, Award, Loader2, Zap, ChevronLeft, ChevronRight, CheckCi
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  // Get user from Redux (This updates instantly when SettingsModal dispatches changes)
   const { user, token } = useSelector((state) => state.auth);
 
   const [data, setData] = useState(null);
@@ -15,7 +16,7 @@ const Dashboard = () => {
   const [currentSlide, setCurrentSlide] = useState(0); 
   const [imgError, setImgError] = useState(false);
 
-  // 🆕 MODAL STATE
+  // Modal State
   const [showCertModal, setShowCertModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
 
@@ -26,7 +27,6 @@ const Dashboard = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        // ✅ CLEANED: Removed manual headers. Interceptor handles auth now.
         const response = await client.get('/api/courses/dashboard/stats/');
         setData(response.data);
       } catch (err) {
@@ -55,11 +55,9 @@ const Dashboard = () => {
   
   const handleCardClick = (course) => {
     if (course.progress === 100) {
-      // If complete, Open the "Small Window" (Modal)
       setSelectedCourse(course);
       setShowCertModal(true);
     } else {
-      // If incomplete, set as Hero Slide or navigate
       const index = activeCourses.findIndex(c => c.id === course.id);
       if (index !== -1) {
         setCurrentSlide(index);
@@ -76,12 +74,10 @@ const Dashboard = () => {
     try {
       console.log(`Downloading certificate for: ${selectedCourse.title}`);
 
-      // ✅ CLEANED: Removed manual headers. Kept responseType: 'blob'.
       const response = await client.get(`/api/courses/${selectedCourse.id}/certificate/`, {
         responseType: 'blob', 
       });
 
-      // Create Download Link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -89,11 +85,9 @@ const Dashboard = () => {
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup
       link.remove();
       window.URL.revokeObjectURL(url);
       
-      // Success! Close modal and go to course
       setShowCertModal(false);
       navigate(`/courses/${selectedCourse.id}`);
 
@@ -133,7 +127,10 @@ const Dashboard = () => {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.username}!</h1>
+          {/* ✅ UPDATED: Uses First Name if available, otherwise fallback to Username */}
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user?.first_name || user?.username}!
+          </h1>
           <p className="text-gray-500 mt-1">
              {activeCourses.length > 0 
                ? `You have ${activeCourses.length} courses in progress.` 
@@ -167,7 +164,6 @@ const Dashboard = () => {
                  <h2 className="text-3xl font-bold text-gray-900 mb-2">{heroCourse.title}</h2>
                  <p className="text-gray-500 text-sm mb-4">{heroCourse.total_lessons} Lessons • Keep going!</p>
                  
-                 {/* ✅ 1. Progress Bar (Enhanced) */}
                  <div className="w-full bg-gray-100 rounded-full h-4 mb-2 overflow-hidden shadow-inner">
                    <div 
                      className="bg-blue-600 h-full rounded-full transition-all duration-700 ease-out relative" 
@@ -177,7 +173,6 @@ const Dashboard = () => {
                    </div>
                  </div>
 
-                 {/* ✅ 2. Progress Text (The Missing Piece!) */}
                  <div className="flex justify-between items-center mb-4">
                     <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
                       {heroCourse.progress}% Completed
@@ -195,7 +190,6 @@ const Dashboard = () => {
              </div>
           </div>
 
-          {/* Arrows */}
           {activeCourses.length > 1 && (
             <>
               <button onClick={prevSlide} className="absolute left-[-20px] top-1/2 -translate-y-1/2 bg-white p-3 rounded-full shadow-lg border border-gray-100 text-gray-700 hover:text-blue-600 hover:scale-110 transition-all z-10 hidden md:block"><ChevronLeft size={24}/></button>
@@ -205,7 +199,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* GRID SECTION (All Courses) */}
+      {/* GRID SECTION */}
       <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
         <BookOpen className="text-gray-400" size={20}/> Your Learning Library
       </h3>
@@ -219,13 +213,11 @@ const Dashboard = () => {
                 ${course.progress === 100 ? 'border-green-200 bg-green-50/30' : 'border-gray-100'}
             `}
           >
-            {/* Thumbnail */}
             <div className="h-40 w-full rounded-xl bg-gray-200 overflow-hidden relative">
                {course.thumbnail ? (
                   <img src={course.thumbnail} className="w-full h-full object-cover" alt="" onError={(e) => {e.target.style.display='none'}} />
                ) : <div className="w-full h-full flex items-center justify-center"><BookOpen className="text-gray-400"/></div>}
                
-               {/* 100% Overlay */}
                {course.progress === 100 && (
                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <span className="text-white font-bold flex items-center gap-2"><Award/> Certificate Ready</span>
@@ -233,7 +225,6 @@ const Dashboard = () => {
                )}
             </div>
 
-            {/* Content */}
             <div className="flex flex-col justify-between flex-1">
                 <div>
                    <h4 className="font-bold text-gray-900 line-clamp-1">{course.title}</h4>
@@ -242,12 +233,10 @@ const Dashboard = () => {
 
                 <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                   {course.progress === 100 ? (
-                    // ✅ COMPLETED TEXT
                     <div className="text-xs font-bold text-green-700 flex items-center gap-1 w-full">
                        <CheckCircle size={14} /> Completed. <span className="underline ml-1">Get Certificate</span>
                     </div>
                   ) : (
-                    // ⚡️ PROGRESS TEXT
                     <div className="text-xs font-semibold text-blue-600 flex items-center gap-1">
                       <Zap size={12} fill="currentColor"/> {course.progress}% Progress
                     </div>
@@ -258,11 +247,10 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* --- 🆕 MODAL POPUP --- */}
+      {/* MODAL */}
       {showCertModal && selectedCourse && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
-              
               <button onClick={() => setShowCertModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                 <X size={20} />
               </button>
@@ -282,16 +270,10 @@ const Dashboard = () => {
                  </p>
 
                  <div className="flex gap-3">
-                    <button 
-                      onClick={handleCertNo}
-                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-                    >
+                    <button onClick={handleCertNo} className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">
                       No, just view
                     </button>
-                    <button 
-                      onClick={handleCertYes}
-                      className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 transition-colors"
-                    >
+                    <button onClick={handleCertYes} className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 transition-colors">
                       Yes, Download!
                     </button>
                  </div>

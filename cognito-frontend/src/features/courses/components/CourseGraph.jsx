@@ -8,13 +8,13 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css'; 
 
-const CourseGraph = ({ currentCourse, prerequisites }) => { // 👈 We will use 'recursive_prerequisites' from props inside
-  
-  // 1. ✅ BULLETPROOF FIX FOR WARNING: Use useMemo for types
-  const nodeTypes = useMemo(() => ({}), []);
-  const edgeTypes = useMemo(() => ({}), []);
+//FIX: Define these OUTSIDE the component to prevent re-creation warnings
+const nodeTypes = {};
+const edgeTypes = {};
 
-  // 2. Calculate Layout (Manual "Level" System)
+const CourseGraph = ({ currentCourse, prerequisites }) => { 
+  
+  // 1. Calculate Layout (Manual "Level" System)
   const { initialNodes, initialEdges } = useMemo(() => {
     // Safety check
     if (!currentCourse) return { initialNodes: [], initialEdges: [] };
@@ -115,7 +115,7 @@ const CourseGraph = ({ currentCourse, prerequisites }) => { // 👈 We will use 
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView
-        // ✅ PASS MEMOIZED TYPES
+        // PASS STATIC OBJECTS
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         attributionPosition="bottom-right"

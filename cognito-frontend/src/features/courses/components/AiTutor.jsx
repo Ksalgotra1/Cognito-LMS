@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, Copy, Check } from 'lucide-react'; // <--- Added Copy, Check
 import { askAiTutor } from '../api/coursesApi';
 
 const AiTutor = ({ courseId }) => {
@@ -8,6 +8,10 @@ const AiTutor = ({ courseId }) => {
     { id: 1, text: "Hi! I'm your AI Tutor. I know the context of this entire course. Ask me anything!", sender: 'ai' }
   ]);
   const [loading, setLoading] = useState(false);
+  
+  // Track which message was just copied to show the "Check" icon briefly
+  const [copiedId, setCopiedId] = useState(null);
+  
   const messagesEndRef = useRef(null);
 
   // Auto-scroll to bottom
@@ -36,6 +40,13 @@ const AiTutor = ({ courseId }) => {
     }
   };
 
+  //  Copy Logic
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000); // Reset icon after 2 seconds
+  };
+
   return (
     <div className="flex flex-col h-[600px] bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       
@@ -48,7 +59,7 @@ const AiTutor = ({ courseId }) => {
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+          <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''} group`}>
             
             {/* Avatar */}
             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -57,14 +68,34 @@ const AiTutor = ({ courseId }) => {
               {msg.sender === 'ai' ? <Bot size={16} /> : <User size={16} />}
             </div>
 
-            {/* Bubble */}
-            <div className={`p-3 rounded-2xl text-sm max-w-[80%] leading-relaxed ${
-              msg.sender === 'user' 
-                ? 'bg-indigo-600 text-white rounded-tr-none' 
-                : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'
-            } ${msg.isError ? 'bg-red-50 text-red-600 border-red-200' : ''}`}>
-              {msg.text}
+            {/* Bubble Container */}
+            <div className={`relative max-w-[80%] ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
+                
+                {/* The Bubble */}
+                <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                  msg.sender === 'user' 
+                    ? 'bg-indigo-600 text-white rounded-tr-none' 
+                    : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'
+                } ${msg.isError ? 'bg-red-50 text-red-600 border-red-200' : ''}`}>
+                  {msg.text}
+                </div>
+
+                {/*  Copy Button (Only for AI messages) */}
+                {msg.sender === 'ai' && !msg.isError && (
+                    <button 
+                        onClick={() => handleCopy(msg.text, msg.id)}
+                        className="absolute -bottom-6 left-0 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs font-medium"
+                        title="Copy to clipboard"
+                    >
+                        {copiedId === msg.id ? (
+                            <><Check size={12} /> Copied!</>
+                        ) : (
+                            <><Copy size={12} /> Copy</>
+                        )}
+                    </button>
+                )}
             </div>
+
           </div>
         ))}
         
