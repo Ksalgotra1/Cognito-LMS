@@ -10,7 +10,8 @@ from .views import (
     search_content,
     student_dashboard_stats,
     GenerateStudyPlanView,
-    AskAIView  
+    AskAIView,
+    UserProfileView  
 )
 
 urlpatterns = [
@@ -41,4 +42,7 @@ urlpatterns = [
     # --- Study Scheduler Route (The New Algorithmic Feature) ---
     # POST request here triggers the Backtracking/Greedy algorithm
     path('<int:course_id>/generate-plan/', GenerateStudyPlanView.as_view(), name='generate-plan'),
+
+    # --- Profile Page Route ---
+    path('profile/', UserProfileView.as_view(), name='user-profile')
 ]

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course, Module, Lesson, UserProgress, Question, Choice, Certificate  
+from .models import Course, Module, Lesson, UserProgress, Question, Choice, Certificate, Enrollment, UserProfile  
 
 class LessonSerializer(serializers.ModelSerializer):
     is_completed = serializers.SerializerMethodField() 
@@ -130,3 +130,24 @@ class CertificateSerializer(serializers.ModelSerializer):
         model = Certificate
         # Update the fields list to match the new names
         fields = ['certificate_id', 'student', 'course', 'issued_at']
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name') # Editable
+    last_name = serializers.CharField(source='user.last_name')   # Editable
+    
+    # Analytics for the profile card
+    stats = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ['username', 'email', 'first_name', 'last_name', 'bio', 'avatar_url', 'stats']
+
+    def get_stats(self, obj):
+        user = obj.user
+        return {
+            "courses_enrolled": Enrollment.objects.filter(student=user).count(),
+            "certificates_earned": Certificate.objects.filter(user=user).count(),
+            "total_lessons_completed": UserProgress.objects.filter(user=user, is_completed=True).count()
+        }

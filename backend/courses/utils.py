@@ -4,7 +4,7 @@ from datetime import timedelta
 # ==========================================
 #  PART 1: THE SEARCH ENGINE (Trie)
 # ==========================================
-# This logic was previously in trie.py. We moved it here so apps.py can find it easily.
+
 
 class TrieNode:
     """

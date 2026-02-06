@@ -2,7 +2,7 @@
 
 import io
 import qrcode  # <--- For QR Code generation
-from datetime import date
+from datetime import date, timedelta
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from django.apps import apps
@@ -21,8 +21,8 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader  # <--- To read image from memory
 
 # --- APP IMPORTS ---
-from .models import Course, Lesson, UserProgress, Question, Choice, Certificate, Enrollment, StudyPlan
-from .serializers import CourseSerializer, QuestionSerializer, CertificateSerializer
+from .models import Course, Lesson, UserProgress, Question, Choice, Certificate, Enrollment, StudyPlan, UserProfile
+from .serializers import CourseSerializer, QuestionSerializer, CertificateSerializer, UserProfileSerializer
 from .utils import generate_study_schedule
 from django.utils import timezone
 import datetime
@@ -365,8 +365,11 @@ def generate_certificate(request, course_id):
     p.setFont("Helvetica", 16)
     p.drawCentredString(center_x, height - 210, "This is to certify that")
 
-    # Student Name
-    student_name = user.username.upper()
+    # Student Name Logic (Prioritize Real Name)
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    
+    # If full_name is empty (e.g. "", " "), fallback to username
+    student_name = full_name.upper() if full_name else user.username.upper()
     p.setFont("Times-BoldItalic", 40)
     p.drawCentredString(center_x, height - 270, student_name)
 
@@ -589,3 +592,52 @@ class AskAIView(APIView):
             "answer": ai_answer,
             "context_debug": system_prompt # Optional: send back if you want to inspect in Frontend
         })
+    
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get or Create ensures we don't crash if profile doesn't exist yet
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        user = request.user
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        data = request.data
+
+        # --- NAME CHANGE LIMIT LOGIC ---
+        new_first = data.get('first_name')
+        new_last = data.get('last_name')
+
+        # If name is changing, check the limit
+        if new_first or new_last:
+            # 1. Filter history for the last 365 days
+            one_year_ago = timezone.now() - timedelta(days=365)
+            recent_changes = [
+                ts for ts in profile.name_change_history 
+                if datetime.datetime.fromisoformat(ts) > one_year_ago
+            ]
+            
+            # 2. Check Limit (Max 2 per year)
+            if len(recent_changes) >= 2:
+                return Response(
+                    {"error": "Limit reached: You can only change your name 2 times per year."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # 3. Apply Changes
+            if new_first: user.first_name = new_first
+            if new_last: user.last_name = new_last
+            user.save()
+
+            # 4. Log the change
+            profile.name_change_history.append(timezone.now().isoformat())
+
+        # Update Bio
+        if 'bio' in data:
+            profile.bio = data['bio']
+        
+        profile.save()
+        return Response({"message": "Profile updated successfully!"})

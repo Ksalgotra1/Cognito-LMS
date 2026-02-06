@@ -1,10 +1,21 @@
 import ollama
 import json
+import random
+
+# --- MOCK DATA BANK ---
+# Used when Llama 3 is offline or unreachable to prevent demo crashes
+MOCK_RESPONSES = [
+    "That is a great question! Based on the curriculum, this concept builds upon the previous module's fundamentals. I'd recommend reviewing the 'Core Concepts' video for a refresher.",
+    "Interesting point! In a real-world scenario, you would typically handle this using the standard library tools we discussed in Lesson 2.",
+    "I'm currently running in 'Offline Mode' because the GPU server is unreachable. However, the answer generally involves checking your syntax and ensuring all imports are correct.",
+    "To solve this, try breaking the problem down into smaller steps. Start by defining your inputs and expected outputs."
+]
 
 def get_chat_response(system_context, user_question):
     """
     Active Tutor Service (RAG-Enabled).
     Connects to local Llama 3 instance to generate context-aware answers.
+    FALLBACK: Returns a mock response if Llama is offline.
     """
     try:
         response = ollama.chat(model='llama3', messages=[
@@ -13,8 +24,15 @@ def get_chat_response(system_context, user_question):
         ])
         return response['message']['content']
     except Exception as e:
+        # Fallback Mechanism (The "Safety Net")
         print(f"❌ [AI Service Error] Chat generation failed: {e}")
-        return "I'm having trouble connecting to my brain right now. Is Ollama running?"
+        print("➡️ Switching to Mock Response Mode.")
+        
+        return (
+            "🤖 [AI OFFLINE MODE]\n\n"
+            f"{random.choice(MOCK_RESPONSES)}\n\n"
+            "(Note: This is a fallback response because the local LLM instance is not running.)"
+        )
 
 def get_search_keywords(user_query):
     """
@@ -54,8 +72,10 @@ def get_search_keywords(user_query):
             return json.loads(clean_json)
             
         print(f"⚠️ [AI Parser Warning] Could not find JSON in response: {content}")
-        return []
+        # Fallback: Return simple split if JSON fails
+        return user_query.split()
         
     except Exception as e:
         print(f"❌ [AI Service Error] Keyword extraction failed: {e}")
-        return []
+        # Fallback: Just return the words the user typed so search doesn't break
+        return user_query.split()
