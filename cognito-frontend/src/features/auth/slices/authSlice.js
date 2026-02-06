@@ -66,6 +66,15 @@ const authSlice = createSlice({
     resetRegistration: (state) => {
       state.registrationSuccess = false;
       state.error = null;
+    },
+    //  Manual update for Profile Settings (Instant UI Refresh)
+    updateUser: (state, action) => {
+      // Merge new data (first_name, last_name) into existing user object
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        // Sync to localStorage so it persists on refresh
+        localStorage.setItem('user', JSON.stringify(state.user));
+      }
     }
   },
   extraReducers: (builder) => {
@@ -109,5 +118,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { resetRegistration } = authSlice.actions;
+export const { resetRegistration, updateUser } = authSlice.actions;
 export default authSlice.reducer;
