@@ -11,7 +11,8 @@ from .views import (
     student_dashboard_stats,
     GenerateStudyPlanView,
     AskAIView,
-    UserProfileView  
+    UserProfileView,
+    enroll_course
 )
 
 urlpatterns = [
@@ -44,5 +45,8 @@ urlpatterns = [
     path('<int:course_id>/generate-plan/', GenerateStudyPlanView.as_view(), name='generate-plan'),
 
     # --- Profile Page Route ---
-    path('profile/', UserProfileView.as_view(), name='user-profile')
+    path('profile/', UserProfileView.as_view(), name='user-profile'),
+
+    # --- Enrollment Route ---
+    path('<int:course_id>/enroll/', enroll_course, name='enroll-course')
 ]
