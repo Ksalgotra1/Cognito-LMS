@@ -3,38 +3,37 @@
 import io
 import qrcode  # <--- For QR Code generation
 from datetime import date, timedelta
+import datetime
+import time
+import random
+import json
+
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from django.apps import apps
 from django.db.models import Count, Q  # <--- Added for Analytics
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView # Needed for Class-Based Views like GenerateStudyPlanView
+from rest_framework.views import APIView 
 
 # --- REPORTLAB IMPORTS (For PDF Generation) ---
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
-from reportlab.lib.utils import ImageReader  # <--- To read image from memory
+from reportlab.lib.utils import ImageReader
 
 # --- APP IMPORTS ---
 from .models import Course, Lesson, UserProgress, Question, Choice, Certificate, Enrollment, StudyPlan, UserProfile
 from .serializers import CourseSerializer, QuestionSerializer, CertificateSerializer, UserProfileSerializer
 from .utils import generate_study_schedule
-from django.utils import timezone
-import datetime
 
 # --- SERVICE IMPORTS ---
 from .services import get_rag_context
-import time
-import random # For the mock response
-
-# --- AI CONTEXT IMPORTS ---
-import json
-from django.db.models import Q 
 from .ai_client import get_chat_response, get_search_keywords 
 
 # --- TASK IMPORTS ---
@@ -58,27 +57,43 @@ class CourseListCreateView(generics.ListCreateAPIView):
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Handles retrieving, updating, and deleting a specific course.
-    🔥 UPDATED: Now includes 'Locking' logic based on enrollment.
+    🔥 UPDATED: Includes 'Locking' logic AND N+1 Query Optimization.
     """
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def retrieve(self, request, *args, **kwargs):
-        # 1. Standard retrieval logic
         instance = self.get_object()
         
-        # 2. 🔥 CACHE WARMER (Predictive Loading) 🔥
+        # 1. 🔥 CACHE WARMER (Predictive Loading) 🔥
         # We force the "Heavy Lifting" (Grandparent DAG calculation) to happen 
         # right now, while the user is reading the course title.
         try:
             get_rag_context(instance.id, request.user)
-            print(f"🔥 [Cache Warmer] Pre-loaded DAG for Course {instance.id}")
-        except Exception as e:
+            # print(f"🔥 [Cache Warmer] Pre-loaded DAG for Course {instance.id}")
+        except Exception:
             pass # Silently fail if Redis is down
 
-        # 3. Get Serialized Data
-        serializer = self.get_serializer(instance)
+        # 2. ⚡️ N+1 QUERY OPTIMIZATION ⚡️
+        # Fetch ALL completed lesson IDs for this user & course in ONE query.
+        # This prevents the serializer from hitting the DB for every single lesson.
+        completed_lesson_ids = set()
+        if request.user.is_authenticated:
+            completed_lesson_ids = set(
+                UserProgress.objects.filter(
+                    user=request.user, 
+                    lesson__module__course=instance, 
+                    is_completed=True
+                ).values_list('lesson_id', flat=True)
+            )
+
+        # 3. Get Serialized Data with Optimized Context
+        # We pass the pre-fetched set to the serializer context
+        context = self.get_serializer_context()
+        context['completed_lesson_ids'] = completed_lesson_ids
+        
+        serializer = self.get_serializer(instance, context=context)
         data = serializer.data
 
         # 4. 🔒 LOCKING LOGIC 🔒
@@ -92,7 +107,6 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
         data['is_enrolled'] = is_enrolled
 
         # Iterate through modules/lessons to lock content if not enrolled
-        # (Assumes serializer structure: modules -> lessons)
         if 'modules' in data:
             for module in data['modules']:
                 if 'lessons' in module:
@@ -104,7 +118,7 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
                             # User NOT enrolled: Lock it 🔒
                             lesson['content'] = "🔒 Locked. Enroll to view content."
                             lesson['is_locked'] = True
-                            # Optional: Hide video URL if you add it to the model later
+                            # Hide sensitive data
                             lesson['video_url'] = None 
 
         return Response(data)
@@ -600,7 +614,7 @@ def enroll_course(request, course_id):
     # 2. Create Enrollment
     Enrollment.objects.create(student=user, course=course)
 
-    # 3. ⚡️ TRIGGER ASYNC TASK (Celery)
+    # 3. TRIGGER ASYNC TASK (Celery)
     # .delay() sends it to Redis. The server returns immediately (Fast UI).
     send_enrollment_email.delay(user.email, course.title)
 

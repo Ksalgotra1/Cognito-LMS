@@ -3,17 +3,26 @@ from .models import Course, Module, Lesson, UserProgress, Question, Choice, Cert
 
 class LessonSerializer(serializers.ModelSerializer):
     is_completed = serializers.SerializerMethodField() 
+    
+    # Count questions so frontend knows if a quiz exists
+    # Relies on related_name='questions' in the Question model
+    questions_count = serializers.IntegerField(source='questions.count', read_only=True)
 
     class Meta:
         model = Lesson
-        fields = ['id', 'title', 'content', 'order', 'is_completed', 'duration_minutes']
+        fields = ['id', 'title', 'content', 'order', 'is_completed', 'duration_minutes', 'questions_count']
 
-    # Logic: Check if the current user has finished this lesson
     def get_is_completed(self, obj):
+        # Optimization: Check if we have the pre-fetched list in context
+        # This prevents running a database query for every single lesson
+        completed_ids = self.context.get('completed_lesson_ids')
+        if completed_ids is not None:
+            return obj.id in completed_ids
+
+        # Fallback: The standard way (1 DB Hit per lesson)
+        # This runs only if the View does not provide the context
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            # Note: This runs one query per lesson. 
-            # For strict optimization in lists, consider pre-fetching UserProgress in the View.
             return UserProgress.objects.filter(user=request.user, lesson=obj, is_completed=True).exists()
         return False
 
@@ -71,12 +80,10 @@ class CourseSerializer(serializers.ModelSerializer):
         return round((completed_lessons / total_lessons) * 100)
     
     def get_prerequisites(self, obj):
-        # OPTIMIZATION: We use list comprehension instead of .values()
+        # Optimization: We use list comprehension instead of .values()
         # This ensures we use the pre-fetched objects from memory (prefetch_related)
-        # instead of hitting the DB again.
         return [{'id': p.id, 'title': p.title} for p in obj.prerequisites.all()]
 
-    # ✅ NEW: The Logic for the Graph
     def get_recursive_prerequisites(self, obj):
         """
         Returns a nested list for the DAG Graph:
@@ -96,7 +103,6 @@ class CourseSerializer(serializers.ModelSerializer):
                 'prerequisites': [] 
             }
             # Fetch the Grandparents (Prerequisites of the Prerequisite)
-            # This is 0 DB hits if 'prerequisites__prerequisites' was pre-fetched
             for grandparent in parent.prerequisites.all():
                 parent_data['prerequisites'].append({
                     'id': grandparent.id,
@@ -108,8 +114,7 @@ class CourseSerializer(serializers.ModelSerializer):
 class ChoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Choice
-        # SECURITY ALERT: We DO NOT include 'is_correct' here.
-        # If we did, students could see the answers in the JSON!
+        # Security: We do not include 'is_correct' here to prevent cheating
         fields = ['id', 'text']
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -120,22 +125,18 @@ class QuestionSerializer(serializers.ModelSerializer):
         fields = ['id', 'text', 'choices']
 
 class CertificateSerializer(serializers.ModelSerializer):
-    # Change 'student_name' -> 'student' to match React
     student = serializers.CharField(source='user.username', read_only=True)
-    
-    # Change 'course_title' -> 'course' to match React
     course = serializers.CharField(source='course.title', read_only=True)
 
     class Meta:
         model = Certificate
-        # Update the fields list to match the new names
         fields = ['certificate_id', 'student', 'course', 'issued_at']
 
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
-    first_name = serializers.CharField(source='user.first_name') # Editable
-    last_name = serializers.CharField(source='user.last_name')   # Editable
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
     
     # Analytics for the profile card
     stats = serializers.SerializerMethodField()
