@@ -15,6 +15,8 @@ from django.apps import apps
 from django.db.models import Count, Q  # <--- Added for Analytics
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 
 from rest_framework import generics, permissions, status
 from rest_framework.throttling import UserRateThrottle
@@ -47,14 +49,22 @@ class CourseListCreateView(generics.ListCreateAPIView):
     """
     Handles listing all courses and creating new ones.
     Only authenticated users can create courses (Instructors).
+    Caches course list for 5 minutes to reduce DB load.
     """
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         # Automatically assign the logged-in user as the instructor
         serializer.save(instructor=self.request.user)
+        # Invalidate cache on new course creation
+        from django.core.cache import cache
+        cache.clear()  # Clear all cache (simple approach)
 
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -515,7 +525,7 @@ class GenerateStudyPlanView(APIView):
         
         return Response(plan.generated_schedule, status=status.HTTP_200_OK)
     
-# --- Ask AI ---
+# --- Ask AI (Async via Celery) ---
 
 class AIThrottle(UserRateThrottle):
     """Custom throttle for expensive AI endpoints."""
@@ -523,10 +533,10 @@ class AIThrottle(UserRateThrottle):
 
 class AskAIView(APIView):
     """
-    The Real AI Tutor Endpoint.
-    1. Builds Context (DAG + History)
-    2. Sends to Llama 3
-    3. Returns real answer
+    Async AI Tutor Endpoint.
+    1. Triggers a Celery task to generate AI response
+    2. Returns task_id immediately (non-blocking)
+    3. Frontend polls for result via get_ai_task_status
     """
     permission_classes = [IsAuthenticated]
     throttle_classes = [AIThrottle]
@@ -536,14 +546,65 @@ class AskAIView(APIView):
         if not user_question:
             return Response({"error": "Question is required"}, status=400)
 
-        system_prompt = get_rag_context(course_id, request.user)
-        print(f"\n--- 🧠 CONTEXT FOR LLAMA 3 ---\n{system_prompt}\n-------------------------------\n")
-        
-        ai_answer = get_chat_response(system_prompt, user_question)
+        # ⚡️ FIRE AND (almost) FORGET
+        # Start the Celery task and return immediately
+        from .tasks import generate_ai_response_task
+        task = generate_ai_response_task.delay(
+            course_id, 
+            request.user.id, 
+            user_question
+        )
 
         return Response({
-            "answer": ai_answer,
-            "context_debug": system_prompt 
+            "task_id": task.id,
+            "status": "processing",
+            "message": "AI is thinking..."
+        }, status=202)  # 202 Accepted
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_ai_task_status(request, task_id):
+    """
+    Frontend polls this endpoint to check if AI response is ready.
+    Returns status: 'processing', 'completed', or 'failed'
+    """
+    from celery.result import AsyncResult
+    
+    task_result = AsyncResult(task_id)
+    
+    if task_result.state == 'PENDING':
+        return Response({
+            "status": "processing",
+            "message": "AI is still thinking..."
+        })
+    elif task_result.state == 'SUCCESS':
+        result = task_result.result
+        if isinstance(result, dict):
+            if result.get("status") == "error":
+                return Response({
+                    "status": "failed",
+                    "error": result.get("answer", "Unknown error")
+                }, status=500)
+            return Response({
+                "status": "completed",
+                "answer": result.get("answer", "")
+            })
+        # Fallback for non-dict results
+        return Response({
+            "status": "completed",
+            "answer": str(result)
+        })
+    elif task_result.state == 'FAILURE':
+        return Response({
+            "status": "failed",
+            "error": str(task_result.result)
+        }, status=500)
+    else:
+        # STARTED, RETRY, etc.
+        return Response({
+            "status": "processing",
+            "message": f"Task state: {task_result.state}"
         })
     
 # --- User Profile Settings ---

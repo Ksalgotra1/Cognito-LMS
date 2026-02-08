@@ -8,6 +8,7 @@ const AiTutor = ({ courseId }) => {
     { id: 1, text: "Hi! I'm your AI Tutor. I know the context of this entire course. Ask me anything!", sender: 'ai' }
   ]);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Thinking...');
   
   // Track which message was just copied to show the "Check" icon briefly
   const [copiedId, setCopiedId] = useState(null);
@@ -27,16 +28,22 @@ const AiTutor = ({ courseId }) => {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
+    setLoadingMessage('AI is thinking...');
 
     try {
-      const data = await askAiTutor(courseId, userMsg.text);
+      // Use the new async API with progress callback
+      const data = await askAiTutor(courseId, userMsg.text, (progressMsg) => {
+        setLoadingMessage(progressMsg);
+      });
       const aiMsg = { id: Date.now() + 1, text: data.answer, sender: 'ai' };
       setMessages(prev => [...prev, aiMsg]);
     } catch (error) {
-      const errorMsg = { id: Date.now() + 1, text: "Sorry, I couldn't reach the server.", sender: 'ai', isError: true };
+      const errorText = error.message || "Sorry, I couldn't reach the server.";
+      const errorMsg = { id: Date.now() + 1, text: errorText, sender: 'ai', isError: true };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setLoading(false);
+      setLoadingMessage('Thinking...');
     }
   };
 
@@ -106,7 +113,7 @@ const AiTutor = ({ courseId }) => {
              </div>
              <div className="bg-white border border-gray-100 p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
                <Loader2 size={14} className="animate-spin text-indigo-500" />
-               <span className="text-xs text-gray-400">Thinking...</span>
+               <span className="text-xs text-gray-400">{loadingMessage}</span>
              </div>
           </div>
         )}

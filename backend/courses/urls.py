@@ -11,6 +11,7 @@ from .views import (
     student_dashboard_stats,
     GenerateStudyPlanView,
     AskAIView,
+    get_ai_task_status,
     UserProfileView,
     enroll_course,
     execute_code
@@ -24,8 +25,9 @@ urlpatterns = [
     path('', CourseListCreateView.as_view(), name='course-list-create'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
     
-    # --- Ask AI Route ---
+    # --- Ask AI Routes (Async) ---
     path('<int:course_id>/ask/', AskAIView.as_view(), name='ask-ai'),
+    path('tasks/<str:task_id>/', get_ai_task_status, name='ai-task-status'),
 
     # --- Search Route (Layer 1: Trie) ---
     path('search/', search_content, name='search-content'),

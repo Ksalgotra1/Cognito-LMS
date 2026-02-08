@@ -180,6 +180,7 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+CELERY_RESULT_EXPIRES = 3600  # Task results expire after 1 hour (cleanup)
 
 # The URL of  server 
 # For now, it is localhost.
