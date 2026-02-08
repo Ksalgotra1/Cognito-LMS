@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from rest_framework import generics, permissions, status
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -514,6 +515,11 @@ class GenerateStudyPlanView(APIView):
         return Response(plan.generated_schedule, status=status.HTTP_200_OK)
     
 # --- Ask AI ---
+
+class AIThrottle(UserRateThrottle):
+    """Custom throttle for expensive AI endpoints."""
+    scope = 'ai'
+
 class AskAIView(APIView):
     """
     The Real AI Tutor Endpoint.
@@ -522,6 +528,7 @@ class AskAIView(APIView):
     3. Returns real answer
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AIThrottle]
 
     def post(self, request, course_id):
         user_question = request.data.get('question')

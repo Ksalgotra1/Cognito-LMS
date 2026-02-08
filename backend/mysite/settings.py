@@ -146,7 +146,11 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '100/hour',
+        'ai': '10/minute',
+    }
 }
 
 # Simple JWT Configuration
