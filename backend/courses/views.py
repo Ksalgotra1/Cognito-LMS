@@ -7,6 +7,7 @@ import datetime
 import time
 import random
 import json
+import requests
 
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
@@ -629,3 +630,42 @@ def enroll_course(request, course_id):
         "message": f"Successfully enrolled in {course.title}",
         "enrolled": True
     }, status=201)
+
+
+# --- Code Execution Proxy ---
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def execute_code(request):
+    """
+    Proxy code execution through backend for logging/security.
+    Prevents direct frontend calls to Piston, enabling rate limiting and abuse protection.
+    """
+    code = request.data.get('code', '')
+    language = request.data.get('language', 'python')
+    
+    # Map language to appropriate file extension
+    file_extensions = {
+        'python': 'main.py',
+        'javascript': 'main.js',
+        'java': 'Main.java',
+        'c': 'main.c',
+        'cpp': 'main.cpp',
+    }
+    filename = file_extensions.get(language, 'main.py')
+    
+    try:
+        response = requests.post(
+            'https://emkc.org/api/v2/piston/execute',
+            json={
+                'language': language,
+                'version': '3.10.0',
+                'files': [{'name': filename, 'content': code}]
+            },
+            timeout=30
+        )
+        return Response(response.json())
+    except requests.Timeout:
+        return Response({'error': 'Execution timed out'}, status=408)
+    except requests.RequestException as e:
+        return Response({'error': f'Execution failed: {str(e)}'}, status=500)
