@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, RotateCcw, Terminal, Loader2 } from 'lucide-react';
+import client from '../../lib/axios';
 
 const CodeEditor = ({ 
   initialCode = "# Write your Python code here\nprint('Hello Cognito!')", 
@@ -10,43 +11,40 @@ const CodeEditor = ({
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
 
-  // (Piston API)
+  // Execute code via backend proxy (enables logging/rate limiting)
   const handleRun = async () => {
     setIsRunning(true);
     setOutput(""); // Clear old output
 
     try {
-      // 1. Send code to Piston API (Public Execution Engine)
-      const response = await fetch("https://emkc.org/api/v2/piston/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          language: language, // e.g., "python"
-          version: "3.10.0",  // Piston supports specific versions
-          files: [
-            {
-              name: "main.py",
-              content: code
-            }
-          ]
-        })
+      // 1. Send code to backend proxy (which forwards to Piston)
+      const response = await client.post('/api/courses/execute/', {
+        code: code,
+        language: language
       });
 
-      // 2. Parse the result
-      const data = await response.json();
+      const data = response.data;
 
-      // 3. Display Output
+      // 2. Display Output
       if (data.run) {
         // stdout = Print statements | stderr = Errors
         // We handle both so the user sees errors if their code fails
         const result = data.run.stdout || data.run.stderr || "Process finished with no output.";
         setOutput(result);
+      } else if (data.error) {
+        setOutput(`Error: ${data.error}`);
       } else {
         setOutput("Error: Could not communicate with the execution engine.");
       }
 
     } catch (error) {
-      setOutput(`System Error: ${error.message}`);
+      if (error.response?.status === 429) {
+        setOutput("Rate limit exceeded. Please wait before running code again.");
+      } else if (error.response?.status === 408) {
+        setOutput("Execution timed out. Your code took too long to run.");
+      } else {
+        setOutput(`System Error: ${error.message}`);
+      }
     } finally {
       setIsRunning(false);
     }

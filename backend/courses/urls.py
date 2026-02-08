@@ -12,7 +12,8 @@ from .views import (
     GenerateStudyPlanView,
     AskAIView,
     UserProfileView,
-    enroll_course
+    enroll_course,
+    execute_code
 )
 
 urlpatterns = [
@@ -48,5 +49,8 @@ urlpatterns = [
     path('profile/', UserProfileView.as_view(), name='user-profile'),
 
     # --- Enrollment Route ---
-    path('<int:course_id>/enroll/', enroll_course, name='enroll-course')
+    path('<int:course_id>/enroll/', enroll_course, name='enroll-course'),
+
+    # --- Code Execution Route (Piston Proxy) ---
+    path('execute/', execute_code, name='execute-code'),
 ]
