@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
@@ -19,19 +20,32 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+# --- ENVIRONMENT VALIDATION ---
+def get_env_variable(var_name, default=None, required=True):
+    """
+    Get environment variable or raise an error if required and not set.
+    """
+    value = os.getenv(var_name, default)
+    if required and value is None:
+        error_msg = f"Environment variable '{var_name}' is not set!"
+        if 'runserver' in sys.argv or 'migrate' in sys.argv:
+            raise ValueError(error_msg)
+        print(f"⚠️ WARNING: {error_msg}")
+    return value
 
-if not SECRET_KEY:
-    raise ValueError("No SECRET_KEY set for Django application")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Required environment variables
+SECRET_KEY = get_env_variable('SECRET_KEY', required=True)
 
-ALLOWED_HOSTS = []
+# Optional environment variables with defaults
+DEBUG = get_env_variable('DEBUG', default='True', required=False) == 'True'
+DATABASE_URL = get_env_variable('DATABASE_URL', default=None, required=False)
+REDIS_URL = get_env_variable('REDIS_URL', default='redis://localhost:6379/0', required=False)
+ALLOWED_HOSTS_STR = get_env_variable('ALLOWED_HOSTS', default='localhost,127.0.0.1', required=False)
+
+# Parse ALLOWED_HOSTS from comma-separated string
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.split(',') if host.strip()]
 
 
 # Application definition
@@ -84,12 +98,23 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database Configuration
+# Uses DATABASE_URL if set, otherwise defaults to SQLite
+# To switch to PostgreSQL: pip install psycopg2-binary dj-database-url
+# Then set DATABASE_URL=postgres://user:pass@localhost:5432/cognito_lms
+
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(default=DATABASE_URL)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
