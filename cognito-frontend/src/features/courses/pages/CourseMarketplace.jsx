@@ -84,9 +84,9 @@ const CourseMarketplace = () => {
             >
                 {/* Thumbnail Area */}
                 <div className="h-48 w-full bg-gray-200 relative overflow-hidden">
-                {course.thumbnail ? (
+                {course.thumbnail_url ? (
                     <img 
-                        src={course.thumbnail} 
+                        src={course.thumbnail_url} 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                         alt={course.title} 
                         onError={(e) => {e.target.style.display='none'}} 
