@@ -417,72 +417,82 @@ class CertificateVerifyView(generics.RetrieveAPIView):
 
 # --- HYBRID SEARCH ---
 
-def search_content(request):
+class SearchThrottle(UserRateThrottle):
+    """Rate limit for search endpoint - 200 requests per minute."""
+    scope = 'search'
+
+class SearchContentView(APIView):
     """
-    Unified Hybrid Search.
+    Unified Hybrid Search with Rate Limiting.
     Layer 1 (RAM): Queries Trie for Courses + Lessons instantly.
     Layer 2 (AI): Fallback to Llama 3 -> Queries DB for Courses + Lessons.
     """
-    query = request.GET.get('q', '').strip()
-    if not query: return JsonResponse([], safe=False)
+    permission_classes = [AllowAny]  # Search is public
+    throttle_classes = [SearchThrottle]
 
-    results = []
-    
-    # --- LAYER 1: TRIE (Fast RAM Search) ---
-    try:
-        trie = apps.get_app_config('courses').trie
-        if trie:
-            trie_results = trie.search(query)
-            if trie_results:
-                for r in trie_results:
-                    r_copy = r.copy() 
-                    r_copy['source'] = 'trie_fast' 
-                    results.append(r_copy)
-                return JsonResponse(results[:10], safe=False)
-    except Exception as e:
-        print(f"⚠️ Trie Error: {e}")
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        if not query: 
+            return Response([], status=200)
 
-    # --- LAYER 2: AI FALLBACK (Llama 3) ---
-    print(f"⚠️ Trie failed for '{query}'. Engaging Llama 3...")
-    keywords = get_search_keywords(query)
-    
-    if not keywords:
-        return JsonResponse([], safe=False)
+        results = []
+        
+        # --- LAYER 1: TRIE (Fast RAM Search) ---
+        try:
+            trie = apps.get_app_config('courses').trie
+            if trie:
+                trie_results = trie.search(query)
+                if trie_results:
+                    for r in trie_results:
+                        r_copy = r.copy() 
+                        r_copy['source'] = 'trie_fast' 
+                        results.append(r_copy)
+                    return Response(results[:10], status=200)
+        except Exception as e:
+            print(f"⚠️ Trie Error: {e}")
 
-    q_lookup = Q()
-    for k in keywords:
-        q_lookup |= Q(title__icontains=k) | Q(description__icontains=k)
+        # --- LAYER 2: AI FALLBACK (Llama 3) ---
+        # This layer is expensive, so we apply additional rate limiting logic
+        print(f"⚠️ Trie failed for '{query}'. Engaging Llama 3...")
+        keywords = get_search_keywords(query)
+        
+        if not keywords:
+            return Response([], status=200)
 
-    ai_courses = Course.objects.filter(q_lookup).distinct()[:3]
-    for c in ai_courses:
-        results.append({
-            "id": c.id,
-            "title": c.title,
-            "type": "course",
-            "course_title": None,
-            "url": f"/courses/{c.id}",
-            "source": "ai_semantic",
-            "description": c.description
-        })
-
-    if len(results) < 5:
-        q_lesson = Q()
+        q_lookup = Q()
         for k in keywords:
-            q_lesson |= Q(title__icontains=k)
-            
-        ai_lessons = Lesson.objects.filter(q_lesson).select_related('module__course')[:5]
-        for l in ai_lessons:
+            q_lookup |= Q(title__icontains=k) | Q(description__icontains=k)
+
+        ai_courses = Course.objects.filter(q_lookup).distinct()[:3]
+        for c in ai_courses:
             results.append({
-                "id": l.id,
-                "title": l.title,
-                "type": "lesson",
-                "course_title": f"AI Match in {l.module.course.title}",
-                "url": f"/courses/{l.module.course.id}",
+                "id": c.id,
+                "title": c.title,
+                "type": "course",
+                "course_title": None,
+                "url": f"/courses/{c.id}",
                 "source": "ai_semantic",
-                "description": None
+                "description": c.description
             })
 
-    return JsonResponse(results[:10], safe=False)
+        if len(results) < 5:
+            q_lesson = Q()
+            for k in keywords:
+                q_lesson |= Q(title__icontains=k)
+                
+            ai_lessons = Lesson.objects.filter(q_lesson).select_related('module__course')[:5]
+            for l in ai_lessons:
+                results.append({
+                    "id": l.id,
+                    "title": l.title,
+                    "type": "lesson",
+                    "course_title": f"AI Match in {l.module.course.title}",
+                    "url": f"/courses/{l.module.course.id}",
+                    "source": "ai_semantic",
+                    "description": None
+                })
+
+        return Response(results[:10], status=200)
 
 
 # --- Study Plan Scheduler (Algorithmic) ---

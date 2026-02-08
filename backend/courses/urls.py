@@ -7,7 +7,7 @@ from .views import (
     submit_quiz,
     generate_certificate,
     CertificateVerifyView,
-    search_content,
+    SearchContentView,
     student_dashboard_stats,
     GenerateStudyPlanView,
     AskAIView,
@@ -29,8 +29,8 @@ urlpatterns = [
     path('<int:course_id>/ask/', AskAIView.as_view(), name='ask-ai'),
     path('tasks/<str:task_id>/', get_ai_task_status, name='ai-task-status'),
 
-    # --- Search Route (Layer 1: Trie) ---
-    path('search/', search_content, name='search-content'),
+    # --- Search Route (Layer 1: Trie + AI Fallback, Rate Limited) ---
+    path('search/', SearchContentView.as_view(), name='search-content'),
     
     # --- Lesson Completion Route ---
     path('lessons/<int:lesson_id>/complete/', toggle_lesson_completion, name='toggle-completion'),

@@ -150,6 +150,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'user': '100/hour',
         'ai': '10/minute',
+        'search': '200/minute',
     }
 }
 
