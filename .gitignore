@@ -17,3 +17,6 @@ dist/
 backend/.idea/
 extract_code.py
 project_code_dump.txt
+
+
+docs/
