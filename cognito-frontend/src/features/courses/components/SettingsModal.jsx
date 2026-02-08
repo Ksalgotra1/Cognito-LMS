@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X, Save, AlertTriangle, Bell, Lock, CheckCircle } from 'lucide-react';
-import { useDispatch } from 'react-redux'; // <--- 1. Import Hook
-import { updateUser } from '../../../features/auth/slices/authSlice'; // <--- 2. Import Action
+import { useDispatch } from 'react-redux';
+import { updateUser } from '../../../features/auth/slices/authSlice';
 import client from '../../../lib/axios';
+import { useToast } from '../../../components/ui/Toast';
 
 const SettingsModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
   const [firstName, setFirstName] = useState(currentUser?.first_name || "");
@@ -13,7 +14,8 @@ const SettingsModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  const dispatch = useDispatch(); // <--- 3. Initialize Dispatch
+  const dispatch = useDispatch();
+  const { addToast } = useToast();
 
   if (!isOpen) return null;
 
@@ -37,6 +39,7 @@ const SettingsModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
       }));
 
       setSuccess("Profile updated successfully!");
+      addToast('Profile updated successfully!', 'success');
       if (onUpdate) onUpdate(); // Refresh parent profile page data
       
       setTimeout(() => {

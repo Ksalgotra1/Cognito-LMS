@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import client from '../../../lib/axios';
+import { useToast } from '../../../components/ui/Toast';
 
 const Quiz = () => {
   const { lessonId } = useParams();
   const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth);
+  const { addToast } = useToast();
 
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
@@ -46,8 +48,9 @@ const Quiz = () => {
         config
       );
       setResult(response.data);
+      addToast(response.data.passed ? '🎉 Quiz passed!' : 'Quiz submitted', response.data.passed ? 'success' : 'error');
     } catch (err) {
-      alert("Something went wrong submitting your quiz.");
+      // Error toast handled by axios interceptor
     }
   };
 

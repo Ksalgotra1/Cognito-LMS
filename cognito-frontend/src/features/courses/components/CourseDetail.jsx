@@ -12,12 +12,14 @@ import { toggleLessonCompletion } from '../slices/coursesSlice';
 import CourseGraph from './CourseGraph';
 import StudyPlanModal from './StudyPlanModal';
 import AiTutor from './AiTutor'; 
-import CodeEditor from '../../../components/ui/CodeEditor'; 
+import CodeEditor from '../../../components/ui/CodeEditor';
+import { useToast } from '../../../components/ui/Toast'; 
 
 const CourseDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { addToast } = useToast();
   
   // --- STATE ---
   const [course, setCourse] = useState(null);
@@ -76,9 +78,9 @@ const CourseDetail = () => {
       await enrollCourse(id);
       // 🔥 Trigger fetch with 'true' to update activeLesson content without full page reload
       await fetchCourseData(true); 
-      alert("🎉 Enrollment Successful! The course is now unlocked.");
+      addToast('🎉 Enrollment Successful! The course is now unlocked.', 'success');
     } catch (error) {
-      alert("Enrollment failed. Please try again.");
+      // Error toast handled by axios interceptor
     } finally {
       setEnrolling(false);
     }
@@ -130,7 +132,7 @@ const CourseDetail = () => {
                 })),
             };
         });
-        alert("Failed to save progress. Please check your connection.");
+        addToast('Failed to save progress. Please check your connection.', 'error');
     }
   };
 
