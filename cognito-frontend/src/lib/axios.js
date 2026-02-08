@@ -19,20 +19,42 @@ client.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// 2. Response Interceptor: Redirects on 401 (Expired Token)
+// 2. Response Interceptor: Attempts token refresh on 401, then redirects if that fails
 client.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response && error.response.status === 401) {
-            console.warn("🔒 Token expired. Redirecting to login...");
-            
-            // Clear bad data
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('user');
+    async (error) => {
+        const originalRequest = error.config;
 
-            // Force Redirect
-            window.location.href = '/login';
+        // Only attempt refresh on 401 and if we haven't already retried
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+
+            try {
+                const refreshToken = localStorage.getItem('refresh_token');
+                if (!refreshToken) throw new Error('No refresh token');
+
+                // Request new access token using refresh token
+                const response = await axios.post('http://127.0.0.1:8000/api/token/refresh/', {
+                    refresh: refreshToken
+                });
+
+                const { access } = response.data;
+                localStorage.setItem('access_token', access);
+                originalRequest.headers.Authorization = `Bearer ${access}`;
+
+                // Retry the original request with new token
+                return client(originalRequest);
+            } catch (refreshError) {
+                console.warn("🔒 Token refresh failed. Redirecting to login...");
+
+                // Clear all auth data
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user');
+
+                // Force redirect to login
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
