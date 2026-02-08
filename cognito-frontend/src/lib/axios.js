@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toastEvents } from './toastEvents';
 
 const client = axios.create({
     baseURL: 'http://127.0.0.1:8000',
@@ -46,6 +47,7 @@ client.interceptors.response.use(
                 return client(originalRequest);
             } catch (refreshError) {
                 console.warn("🔒 Token refresh failed. Redirecting to login...");
+                toastEvents.emit('Session expired. Please log in again.', 'error');
 
                 // Clear all auth data
                 localStorage.removeItem('access_token');
@@ -56,6 +58,16 @@ client.interceptors.response.use(
                 window.location.href = '/login';
             }
         }
+
+        // Show toast for other API errors (except 401 which is handled above)
+        if (error.response?.status !== 401) {
+            const message = error.response?.data?.detail
+                || error.response?.data?.error
+                || error.response?.data?.message
+                || `Request failed (${error.response?.status || 'Network Error'})`;
+            toastEvents.emit(message, 'error');
+        }
+
         return Promise.reject(error);
     }
 );
