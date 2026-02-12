@@ -43,8 +43,15 @@ const Dashboard = () => {
   // --- 2. FILTER LOGIC ---
   const allCourses = data?.enrolled_courses || [];
   
-  // Active = In Progress (<100%). Completed courses go to the grid only.
-  const activeCourses = allCourses.filter(course => course.progress < 100);
+  // Active = In Progress (<100%). Sorted by most recent activity first.
+  const activeCourses = allCourses
+    .filter(course => course.progress < 100)
+    .sort((a, b) => {
+      if (!a.last_activity && !b.last_activity) return 0;
+      if (!a.last_activity) return 1;
+      if (!b.last_activity) return -1;
+      return new Date(b.last_activity) - new Date(a.last_activity);
+    });
   const heroCourse = activeCourses[currentSlide];
 
   useEffect(() => { setImgError(false); }, [currentSlide]);
@@ -200,53 +207,84 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* GRID SECTION */}
+      {/* IN-PROGRESS COURSES */}
       <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
         <BookOpen className="text-gray-400" size={20}/> Your Learning Library
       </h3>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {allCourses.map((course) => (
-          <div 
-            key={course.id} 
-            onClick={() => handleCardClick(course)}
-            className={`bg-white rounded-2xl p-4 shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col gap-4 relative group
-                ${course.progress === 100 ? 'border-green-200 bg-green-50/30' : 'border-gray-100'}
-            `}
-          >
-            <div className="h-40 w-full rounded-xl bg-gray-200 overflow-hidden relative">
-               {course.thumbnail ? (
-                  <img src={course.thumbnail} className="w-full h-full object-cover" alt="" onError={(e) => {e.target.style.display='none'}} />
-               ) : <div className="w-full h-full flex items-center justify-center"><BookOpen className="text-gray-400"/></div>}
-               
-               {course.progress === 100 && (
-                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white font-bold flex items-center gap-2"><Award/> Certificate Ready</span>
-                 </div>
-               )}
-            </div>
+      {activeCourses.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {activeCourses.map((course) => (
+            <div 
+              key={course.id} 
+              onClick={() => handleCardClick(course)}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer flex flex-col gap-4 relative group"
+            >
+              <div className="h-40 w-full rounded-xl bg-gray-200 overflow-hidden relative">
+                 {course.thumbnail ? (
+                    <img src={course.thumbnail} className="w-full h-full object-cover" alt="" onError={(e) => {e.target.style.display='none'}} />
+                 ) : <div className="w-full h-full flex items-center justify-center"><BookOpen className="text-gray-400"/></div>}
+              </div>
 
-            <div className="flex flex-col justify-between flex-1">
-                <div>
-                   <h4 className="font-bold text-gray-900 line-clamp-1">{course.title}</h4>
-                   <p className="text-xs text-gray-500 mt-1">{course.total_lessons} Lessons</p>
-                </div>
+              <div className="flex flex-col justify-between flex-1">
+                  <div>
+                     <h4 className="font-bold text-gray-900 line-clamp-1">{course.title}</h4>
+                     <p className="text-xs text-gray-500 mt-1">{course.total_lessons} Lessons</p>
+                  </div>
 
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                  {course.progress === 100 ? (
-                    <div className="text-xs font-bold text-green-700 flex items-center gap-1 w-full">
-                       <CheckCircle size={14} /> Completed. <span className="underline ml-1">Get Certificate</span>
-                    </div>
-                  ) : (
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                     <div className="text-xs font-semibold text-blue-600 flex items-center gap-1">
                       <Zap size={12} fill="currentColor"/> {course.progress}% Progress
                     </div>
-                  )}
-                </div>
+                  </div>
+              </div>
             </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-400 text-sm mb-8">No courses in progress. Browse the marketplace to enroll!</p>
+      )}
+
+      {/* COMPLETED COURSES */}
+      {allCourses.filter(c => c.progress === 100).length > 0 && (
+        <>
+          <h3 className="text-xl font-bold text-gray-800 mt-12 mb-6 flex items-center gap-2">
+            <Award className="text-green-500" size={20}/> Completed Courses
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {allCourses.filter(c => c.progress === 100).map((course) => (
+              <div 
+                key={course.id} 
+                onClick={() => handleCardClick(course)}
+                className="bg-white rounded-2xl p-4 shadow-sm border border-green-200 bg-green-50/30 hover:shadow-md transition-all cursor-pointer flex flex-col gap-4 relative group"
+              >
+                <div className="h-40 w-full rounded-xl bg-gray-200 overflow-hidden relative">
+                   {course.thumbnail ? (
+                      <img src={course.thumbnail} className="w-full h-full object-cover" alt="" onError={(e) => {e.target.style.display='none'}} />
+                   ) : <div className="w-full h-full flex items-center justify-center"><BookOpen className="text-gray-400"/></div>}
+                   
+                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-white font-bold flex items-center gap-2"><Award/> Certificate Ready</span>
+                   </div>
+                </div>
+
+                <div className="flex flex-col justify-between flex-1">
+                    <div>
+                       <h4 className="font-bold text-gray-900 line-clamp-1">{course.title}</h4>
+                       <p className="text-xs text-gray-500 mt-1">{course.total_lessons} Lessons</p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                      <div className="text-xs font-bold text-green-700 flex items-center gap-1 w-full">
+                         <CheckCircle size={14} /> Completed. <span className="underline ml-1">Get Certificate</span>
+                      </div>
+                    </div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       {/* MODAL */}
       {showCertModal && selectedCourse && (

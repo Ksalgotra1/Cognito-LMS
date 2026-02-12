@@ -190,6 +190,12 @@ def student_dashboard_stats(request):
             next_lesson_title = next_lesson_obj.title
             next_lesson_url = f"/courses/{course.id}"
 
+        # C. Most recent progress activity
+        last_progress = UserProgress.objects.filter(
+            user=user, lesson__module__course=course
+        ).order_by('-updated_at').first()
+        last_activity = last_progress.updated_at.isoformat() if last_progress else None
+
         course_cards.append({
             "id": course.id,
             "title": course.title,
@@ -198,7 +204,8 @@ def student_dashboard_stats(request):
             "completed_lessons": completed_lessons,
             "total_lessons": total_lessons,
             "next_lesson_title": next_lesson_title,
-            "next_lesson_url": next_lesson_url
+            "next_lesson_url": next_lesson_url,
+            "last_activity": last_activity
         })
 
     return Response({
