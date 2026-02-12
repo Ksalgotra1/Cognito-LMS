@@ -14,6 +14,7 @@ import StudyPlanModal from './StudyPlanModal';
 import AiTutor from './AiTutor'; 
 import CodeEditor from '../../../components/ui/CodeEditor';
 import { useToast } from '../../../components/ui/Toast'; 
+import { CourseDetailSkeleton } from '../../../components/ui/Skeletons';
 
 const CourseDetail = () => {
   const { id } = useParams();
@@ -143,7 +144,7 @@ const CourseDetail = () => {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center text-indigo-600 font-medium">Loading classroom...</div>;
+  if (loading) return <CourseDetailSkeleton />;
   if (error || !course) return <div className="p-8 text-center text-red-500 font-bold">Course not found or access denied.</div>;
 
   const isEnrolled = course.is_enrolled;

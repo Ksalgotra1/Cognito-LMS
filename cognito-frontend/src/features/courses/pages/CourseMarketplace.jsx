@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import client from '../../../lib/axios';
-import { Play, BookOpen, Loader2, Compass, Sparkles, Rocket, User, CheckCircle } from 'lucide-react';
+import { Play, BookOpen, Compass, Sparkles, Rocket, User, CheckCircle } from 'lucide-react';
+import { MarketplaceSkeleton } from '../../../components/ui/Skeletons';
 
 const CourseMarketplace = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const CourseMarketplace = () => {
      navigate(`/courses/${courseId}`);
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600 h-10 w-10" /></div>;
+  if (loading) return <MarketplaceSkeleton />;
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen font-sans max-w-7xl mx-auto relative">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import client from '../../../lib/axios';
-import { User, Award, BookOpen, Settings, LogOut, Loader2 } from 'lucide-react';
+import { User, Award, BookOpen, Settings, LogOut } from 'lucide-react';
+import { ProfileSkeleton } from '../../../components/ui/Skeletons';
 import { useDispatch } from 'react-redux';
 import { logout } from '../../auth/slices/authSlice';
 import SettingsModal from '../components/SettingsModal';
@@ -26,7 +27,7 @@ const ProfilePage = () => {
     fetchProfile();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600"/></div>;
+  if (loading) return <ProfileSkeleton />;
   if (!profile) return <div className="p-10 text-center">Failed to load profile.</div>;
 
   return (
