@@ -182,7 +182,7 @@ def student_dashboard_stats(request):
         
         next_lesson_id = next((lid for lid in all_lesson_ids if lid not in completed_lesson_ids), None)
         
-        next_lesson_title = "Course Completed! 🏆"
+        next_lesson_title = "Course Completed!"
         next_lesson_url = None
         
         if next_lesson_id:

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import client from '../../../lib/axios';
 import { useToast } from '../../../components/ui/Toast';
+import { PartyPopper, XCircle, CheckCircle2, ArrowLeft, RotateCcw } from 'lucide-react';
 
 const Quiz = () => {
   const { lessonId } = useParams();
@@ -48,7 +49,7 @@ const Quiz = () => {
         config
       );
       setResult(response.data);
-      addToast(response.data.passed ? '🎉 Quiz passed!' : 'Quiz submitted', response.data.passed ? 'success' : 'error');
+      addToast(response.data.passed ? 'Quiz passed!' : 'Quiz submitted', response.data.passed ? 'success' : 'error');
     } catch (err) {
       // Error toast handled by axios interceptor
     }
@@ -59,36 +60,66 @@ const Quiz = () => {
 
   // --- RESULT SCREEN ---
   if (result) {
+    const passed = result.passed;
     return (
-      <div className="max-w-2xl mx-auto p-8 bg-white rounded-lg shadow mt-10 text-center">
-        <h2 className="text-3xl font-bold mb-4">Quiz Results</h2>
-        
-        <div className={`text-6xl font-bold mb-6 ${result.passed ? 'text-green-600' : 'text-red-600'}`}>
-          {result.score}%
+      <div className="min-h-[70vh] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          
+          {/* Hero Header */}
+          <div className={`px-8 pt-10 pb-8 text-center ${passed ? 'bg-gradient-to-b from-green-50 to-white' : 'bg-gradient-to-b from-red-50 to-white'}`}>
+            <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-lg ${passed ? 'bg-green-100 ring-4 ring-green-200' : 'bg-red-100 ring-4 ring-red-200'}`}>
+              {passed 
+                ? <CheckCircle2 size={40} className="text-green-600" /> 
+                : <XCircle size={40} className="text-red-500" />
+              }
+            </div>
+
+            {/* Score */}
+            <div className={`text-5xl font-extrabold tracking-tight mb-1 ${passed ? 'text-green-600' : 'text-red-600'}`}>
+              {result.score}%
+            </div>
+            <p className="text-sm text-gray-500 font-medium">
+              {result.correct} of {result.total} correct
+            </p>
+          </div>
+
+          {/* Message Card */}
+          <div className="px-8 pb-8">
+            <div className={`rounded-xl p-5 mb-6 ${passed ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
+              <div className="flex items-start gap-3">
+                {passed 
+                  ? <PartyPopper size={22} className="text-green-600 mt-0.5 shrink-0" />
+                  : <RotateCcw size={22} className="text-red-500 mt-0.5 shrink-0" />
+                }
+                <div>
+                  <h3 className={`font-bold text-base mb-1 ${passed ? 'text-green-800' : 'text-red-800'}`}>
+                    {passed ? 'Great job!' : 'Not quite there'}
+                  </h3>
+                  <p className={`text-sm leading-relaxed ${passed ? 'text-green-700' : 'text-red-700'}`}>
+                    {passed 
+                      ? 'You passed this quiz. Your progress has been saved — keep going!' 
+                      : 'Review the lesson material and give it another shot. You can retake this quiz anytime.'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <button 
+              onClick={() => navigate(-1)}
+              className={`w-full py-3 px-6 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 shadow-md ${
+                passed 
+                  ? 'bg-green-600 hover:bg-green-700 shadow-green-200' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+              }`}
+            >
+              <ArrowLeft size={18} />
+              {passed ? 'Back to Lesson' : 'Review & Retry'}
+            </button>
+          </div>
+
         </div>
-        
-        <p className="text-xl mb-6">
-          You got <span className="font-bold">{result.correct}</span> out of <span className="font-bold">{result.total}</span> correct.
-        </p>
-
-        {/* --- MESSAGE --- */}
-        {result.passed ? (
-           <div className="bg-green-100 text-green-800 p-4 rounded mb-6">
-             🎉 Congratulations! You passed this lesson.
-           </div>
-        ) : (
-           <div className="bg-red-100 text-red-800 p-4 rounded mb-6">
-             ❌ You didn't pass. Review the lesson and try again!
-           </div>
-        )}
-        {/* ------------------------------------- */}
-
-        <button 
-          onClick={() => navigate(-1)}
-          className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700"
-        >
-          Back to Lesson
-        </button>
       </div>
     );
   }

@@ -299,7 +299,7 @@ const Dashboard = () => {
                     <Award size={32} className="text-green-600" />
                  </div>
                  
-                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations! 🎉</h2>
+                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
                  <p className="text-gray-600 mb-6">
                    You have successfully completed <strong>{selectedCourse.title}</strong>.
                  </p>

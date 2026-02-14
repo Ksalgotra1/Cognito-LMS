@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Trophy, PlayCircle } from 'lucide-react';
 
 const CourseCard = ({ course, onDownloadCertificate }) => {
   // Default to 0 if progress is missing or null
@@ -18,9 +19,7 @@ const CourseCard = ({ course, onDownloadCertificate }) => {
         ) : (
           // Fallback placeholder if no image exists
           <div className="flex items-center justify-center h-full bg-indigo-100 text-indigo-400">
-            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-            </svg>
+            <PlayCircle className="w-16 h-16" />
           </div>
         )}
       </div>
@@ -64,7 +63,7 @@ const CourseCard = ({ course, onDownloadCertificate }) => {
               className="px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors shadow-sm flex items-center justify-center"
               title="Download Certificate (Requires 100% Completion)"
             >
-              🏆
+              <Trophy size={18} />
             </button>
           </div>
 

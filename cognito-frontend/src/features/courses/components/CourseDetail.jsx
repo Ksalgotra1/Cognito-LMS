@@ -79,7 +79,7 @@ const CourseDetail = () => {
       await enrollCourse(id);
       // 🔥 Trigger fetch with 'true' to update activeLesson content without full page reload
       await fetchCourseData(true); 
-      addToast('🎉 Enrollment Successful! The course is now unlocked.', 'success');
+      addToast('Enrollment Successful! The course is now unlocked.', 'success');
     } catch (error) {
       // Error toast handled by axios interceptor
     } finally {
