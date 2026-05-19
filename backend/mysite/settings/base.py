@@ -145,3 +145,9 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 CELERY_RESULT_EXPIRES = 3600
+
+# --- AI Provider Configuration ---
+# Options: 'ollama' (local Llama 3, free) | 'openai' (GPT-4o via GitHub Models)
+AI_PROVIDER = get_env_variable('AI_PROVIDER', default='ollama', required=False)
+AI_MODEL = get_env_variable('AI_MODEL', default='llama3', required=False)
+AI_API_KEY = get_env_variable('AI_API_KEY', default='', required=False)
