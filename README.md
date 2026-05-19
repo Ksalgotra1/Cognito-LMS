@@ -27,7 +27,7 @@ The platform handles the complete learning lifecycle: course discovery in a mark
 | **Database** | SQLite (dev), PostgreSQL (prod) |
 | **Caching** | Redis via django-redis |
 | **Async** | Celery 5 with Redis broker |
-| **AI/LLM** | Ollama (Llama 3, local inference) |
+| **AI/LLM** | Modular provider: Ollama (Llama 3, local) or OpenAI (cloud) — env-switchable |
 | **Code Execution** | Piston API (sandboxed, proxied through backend) |
 | **Visualization** | React Flow (DAG), Monaco Editor (code lab), Recharts (analytics) |
 | **Documents** | ReportLab (PDF certificates), qrcode (QR generation) |
@@ -68,7 +68,7 @@ graph TB
 
     subgraph AsyncLayer ["◆ Async Workers"]
         Celery["Celery Worker"]
-        Ollama["Ollama / Llama 3"]
+        LLM["AI Provider<br/>Ollama / OpenAI"]
         Email["Email Dispatch"]
     end
 
@@ -80,7 +80,7 @@ graph TB
     Redis --> Redis_db1
     DRF -- ".delay()" --> Redis_db0
     Redis_db0 --> Celery
-    Celery --> Ollama
+    Celery --> LLM
     Celery --> Email
     Celery -- "Store Result" --> Redis_db0
     Redux --> Axios
@@ -212,7 +212,7 @@ flowchart LR
     TrieCheck -- "No (miss)" --> AI
 
     subgraph Layer2 ["Layer 2: AI Semantic Fallback"]
-        AI["Llama 3: Extract Keywords"]
+        AI["AI Provider: Extract Keywords<br/>(Ollama or OpenAI)"]
         AI --> DBScan["icontains scan<br/>Courses + Lessons"]
         DBScan --> SemanticReturn["Return results<br/>tagged: ai_semantic"]
     end
@@ -339,7 +339,7 @@ sequenceDiagram
     participant D as Django API
     participant R as Redis
     participant C as Celery Worker
-    participant O as Ollama (Llama 3)
+    participant O as AI Provider (Ollama / OpenAI)
 
     U->>F: Type question in AiTutor chat
     F->>D: POST /courses/:id/ask/
@@ -362,7 +362,7 @@ sequenceDiagram
     end
     C->>C: Fetch LIVE user progress
     C->>C: Assemble system prompt
-    C->>O: ollama.chat(model='llama3')
+    C->>O: provider.chat(system_context, question)
     O-->>C: AI response
     C->>R: Store result (expires 3600s)
 
@@ -445,7 +445,7 @@ The student opens the Study Plan modal, sets a target completion date, and adjus
 
 ### 6. AI Tutor
 
-From the course detail page, the student opens the "Coding Lab and AI" tab. The AI tutor chat panel uses RAG: it pre-loads the full course structure, DAG relationships, and the student's completion history. Queries are processed asynchronously via Celery with 2-second polling on the frontend. Responses appear in a chat interface with copy-to-clipboard support.
+From the course detail page, the student opens the "Coding Lab and AI" tab. The AI tutor chat panel uses RAG: it pre-loads the full course structure, DAG relationships, and the student's completion history. Queries are processed asynchronously via Celery with 2-second polling on the frontend. The AI backend is provider-agnostic -- a single environment variable switches between local Ollama inference and cloud-based OpenAI without any code changes. Responses appear in a chat interface with copy-to-clipboard support.
 
 ### 7. Code Lab
 
@@ -473,7 +473,7 @@ The scheduler implements a First-Fit Decreasing bin-packing variant. Lessons are
 
 ### ● 2-Layer Search (Trie + AI Fallback)
 
-The Trie is built at server startup from all course and lesson titles. Each `TrieNode` uses `__slots__` for memory efficiency, storing children and a list of associated data payloads. Search is case-insensitive and prefix-based, delivering sub-millisecond lookups from RAM with zero network overhead. When the Trie returns no results, the system falls back to Llama 3, which extracts search keywords from the natural-language query. These keywords drive `icontains` queries against the database. Results from each layer are tagged with their source for frontend badge rendering.
+The Trie is built at server startup from all course and lesson titles. Each `TrieNode` uses `__slots__` for memory efficiency, storing children and a list of associated data payloads. Search is case-insensitive and prefix-based, delivering sub-millisecond lookups from RAM with zero network overhead. When the Trie returns no results, the system falls back to the active AI provider (Ollama or OpenAI), which extracts search keywords from the natural-language query. These keywords drive `icontains` queries against the database. Results from each layer are tagged with their source for frontend badge rendering.
 
 ### ● Redis + Celery Async Orchestration
 
@@ -587,7 +587,13 @@ backend/
     services.py              -- RAG context builder (Redis + DB hybrid)
     utils.py                 -- CourseTrie, generate_study_schedule
     tasks.py                 -- Celery tasks (AI response, email)
-    ai_client.py             -- Ollama/Llama 3 integration
+    ai_client.py             -- Backwards-compat shim (delegates to ai/)
+    ai/
+      __init__.py            -- Provider router + public API
+      base.py                -- Abstract AIProvider interface
+      ollama_provider.py     -- Ollama/Llama 3 local inference
+      openai_provider.py     -- OpenAI cloud inference
+      mock.py                -- Shared fallback responses (offline mode)
     apps.py                  -- Trie initialization at startup
     urls.py                  -- URL patterns for all course endpoints
     admin.py                 -- Course/Module/Lesson admin
@@ -604,7 +610,7 @@ backend/
 - Python 3.11+
 - Node.js 18+
 - Redis 7+
-- Ollama (for AI features)
+- Ollama (for local AI) **or** an OpenAI API key (for cloud AI)
 
 ### Backend Setup
 
@@ -656,7 +662,11 @@ redis-cli ping  # Should return PONG
 celery -A mysite worker --loglevel=info
 ```
 
-### Ollama Setup (AI Tutor)
+### AI Provider Setup
+
+The AI backend is configured via environment variables. Choose one:
+
+**Option A: Ollama (Local, Free)**
 
 ```bash
 # Install Ollama
@@ -667,6 +677,23 @@ ollama pull llama3
 
 # Verify
 ollama run llama3 "Hello"
+```
+
+Set in `backend/.env`:
+
+```env
+AI_PROVIDER=ollama
+AI_MODEL=llama3
+```
+
+**Option B: OpenAI (Cloud)**
+
+No local setup required. Set in `backend/.env`:
+
+```env
+AI_PROVIDER=openai
+AI_MODEL=gpt-4o
+AI_API_KEY=your-openai-api-key
 ```
 
 ### Frontend Setup
@@ -695,6 +722,9 @@ The frontend runs on `http://localhost:5173` and proxies API calls to `http://lo
 | `ALLOWED_HOSTS` | Prod only | - | Comma-separated hostnames |
 | `CORS_ALLOWED_ORIGINS` | Prod only | - | Comma-separated frontend URLs |
 | `SITE_URL` | No | `http://127.0.0.1:8000` | Base URL for QR codes |
+| `AI_PROVIDER` | No | `ollama` | AI backend: `ollama` or `openai` |
+| `AI_MODEL` | No | `llama3` | Model name (e.g. `llama3`, `gpt-4o`) |
+| `AI_API_KEY` | If openai | - | API key for the OpenAI provider |
 
 ---
 
@@ -860,4 +890,4 @@ The test suite covers 10 test classes across models (DAG cycles, user roles), ut
 
 ---
 
-**Built with** Django 6 ▣ React 19 ▣ Redis ▣ Celery ▣ Ollama/Llama 3
+**Built with** Django 6 ▣ React 19 ▣ Redis ▣ Celery ▣ Ollama/Llama 3 ▣ OpenAI

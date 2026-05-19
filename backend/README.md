@@ -29,7 +29,7 @@ python manage.py runserver      # API on :8000
 celery -A mysite worker -l info  # Worker (separate terminal)
 ```
 
-See the [root README](../docs/README.md) for full setup including Redis and Ollama.
+See the [root README](../docs/README.md) for full setup including Redis and AI provider configuration.
 
 ---
 
@@ -41,7 +41,7 @@ See the [root README](../docs/README.md) for full setup including Redis and Olla
 | Auth | Simple JWT 5.5 (access + refresh, rotation, blacklist) |
 | Task Queue | Celery 5 (Redis broker, db=0) |
 | Cache | django-redis (Redis db=1) |
-| AI/LLM | Ollama / Llama 3 (local) |
+| AI/LLM | Modular: Ollama (local) or OpenAI (cloud) |
 | PDF | ReportLab 4.4 |
 | QR | qrcode 8.2 |
 | DB | SQLite (dev), PostgreSQL (prod) |
@@ -75,7 +75,13 @@ backend/
     services.py                  # RAG context builder
     utils.py                     # CourseTrie, study scheduler
     tasks.py                     # Celery: AI response, email
-    ai_client.py                 # Ollama integration
+    ai_client.py                 # Backwards-compat shim (delegates to ai/)
+    ai/                          # Modular AI provider package
+      __init__.py                # Provider router + public API
+      base.py                    # Abstract AIProvider interface
+      ollama_provider.py         # Ollama/Llama 3 local inference
+      openai_provider.py         # OpenAI cloud inference
+      mock.py                    # Shared fallback responses
     apps.py                      # Trie init at startup
     urls.py                      # Course URL patterns
     tests.py                     # 412-line test suite
@@ -160,7 +166,7 @@ erDiagram
 
 ### Trie Search
 
-`CourseTrie` -- In-memory prefix tree built at startup (`apps.py`). Indexes course and lesson titles. `TrieNode` uses `__slots__` for memory efficiency. Case-insensitive, sub-millisecond lookups. Falls back to AI keyword extraction (Llama 3) when Trie returns no results.
+`CourseTrie` -- In-memory prefix tree built at startup (`apps.py`). Indexes course and lesson titles. `TrieNode` uses `__slots__` for memory efficiency. Case-insensitive, sub-millisecond lookups. Falls back to AI keyword extraction (via active provider) when Trie returns no results.
 
 ### Greedy Study Scheduler
 
@@ -179,7 +185,7 @@ erDiagram
 
 | Task | Trigger | Description |
 |------|---------|-------------|
-| `generate_ai_response_task` | POST `/ask/` | Builds RAG context, calls Ollama, stores result |
+| `generate_ai_response_task` | POST `/ask/` | Builds RAG context, calls AI provider, stores result |
 | `send_enrollment_email` | POST `/enroll/` | Simulated email dispatch (5s delay) |
 
 ---
@@ -212,6 +218,9 @@ export DJANGO_SETTINGS_MODULE=mysite.settings.prod   # Production
 | `ALLOWED_HOSTS` | Prod | -- | Comma-separated hostnames |
 | `CORS_ALLOWED_ORIGINS` | Prod | -- | Comma-separated frontend URLs |
 | `SITE_URL` | No | `http://127.0.0.1:8000` | Base for QR code URLs |
+| `AI_PROVIDER` | No | `ollama` | AI backend: `ollama` or `openai` |
+| `AI_MODEL` | No | `llama3` | Model name (e.g. `llama3`, `gpt-4o`) |
+| `AI_API_KEY` | If openai | -- | API key for the OpenAI provider |
 
 ---
 
