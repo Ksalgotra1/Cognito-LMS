@@ -13,6 +13,7 @@ import SearchBar from './components/ui/SearchBar';
 import CertificateVerify from './features/courses/pages/CertificateVerify';
 import ProfilePage from './features/courses/pages/ProfilePage';
 import CourseMarketplace from './features/courses/pages/CourseMarketplace';
+import LandingPage from './pages/LandingPage';
 
 // --- State & API Imports ---
 import { updateUser } from './features/auth/slices/authSlice'; 
@@ -108,6 +109,13 @@ const MainLayout = () => {
   );
 };
 
+// --- Landing Route (public / redirect if logged in) ---
+const LandingRoute = () => {
+  const { user } = useSelector((state) => state.auth);
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <LandingPage />;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -117,8 +125,8 @@ function App() {
         <Route path="/register" element={<SignupPage />} />
         <Route path="/verify/:id" element={<CertificateVerify />} />
         
-        {/* Redirect Root to Dashboard */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Landing Page (public) — redirects to dashboard if logged in */}
+        <Route path="/" element={<LandingRoute />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
