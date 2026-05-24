@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
 
 from rest_framework import generics, permissions, status
 from rest_framework.throttling import UserRateThrottle
@@ -135,6 +136,47 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         return Response(data)
 
+class HotCoursesView(APIView):
+    """
+    Returns the top courses based on new enrollments in the last 24 hours.
+    Result is cached for 10 minutes.
+    """
+    permission_classes = [AllowAny]  # Publicly accessible for the marketplace
+
+    def get(self, request):
+        cache_key = 'hot_courses_24h'
+        cached_data = cache.get(cache_key)
+        
+        if cached_data is not None:
+            return Response(cached_data)
+            
+        last_24h = timezone.now() - timedelta(hours=24)
+        
+        # Get course IDs with the most enrollments in the last 24h
+        # We limit to 5 hot courses
+        hot_course_ids = Enrollment.objects.filter(enrolled_at__gte=last_24h)\
+            .values('course_id')\
+            .annotate(enrollment_count=Count('id'))\
+            .order_by('-enrollment_count')[:5]
+            
+        if not hot_course_ids:
+            return Response([])
+            
+        course_ids = [item['course_id'] for item in hot_course_ids]
+        
+        # Fetch the actual course objects, preserving the order of hotness
+        # Since course_ids is small (max 5), we can do this simply:
+        courses = Course.objects.filter(id__in=course_ids)
+        course_dict = {course.id: course for course in courses}
+        sorted_courses = [course_dict[cid] for cid in course_ids if cid in course_dict]
+        
+        serializer = CourseSerializer(sorted_courses, many=True, context={'request': request})
+        data = serializer.data
+        
+        # Cache for 10 minutes
+        cache.set(cache_key, data, timeout=60 * 10)
+        
+        return Response(data)
 
 # --- STUDENT ANALYTICS DASHBOARD ---
 

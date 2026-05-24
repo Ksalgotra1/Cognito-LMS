@@ -111,8 +111,8 @@ const MainLayout = () => {
 
 // --- Landing Route (public / redirect if logged in) ---
 const LandingRoute = () => {
-  const { user } = useSelector((state) => state.auth);
-  if (user) return <Navigate to="/dashboard" replace />;
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <LandingPage />;
 };
 

@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import client from '../../../lib/axios';
-import { Play, BookOpen, Compass, Sparkles, Rocket, User, CheckCircle } from 'lucide-react';
+import { Play, BookOpen, Compass, Sparkles, Rocket, User, CheckCircle, ChevronDown } from 'lucide-react';
 import { MarketplaceSkeleton } from '../../../components/ui/Skeletons';
+import HotRightNowSlider from '../components/HotRightNowSlider';
+import { fetchCourses } from '../api/coursesApi';
 
 const CourseMarketplace = () => {
   const navigate = useNavigate();
@@ -12,29 +14,32 @@ const CourseMarketplace = () => {
   const [courses, setCourses] = useState([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState(new Set()); // Store IDs for fast lookup
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // 1. Fetch All Courses (Catalog)
-        const coursesRes = await client.get('/api/courses/');
+        // 1. Fetch First Page of Courses (Catalog)
+        const coursesData = await fetchCourses(1);
         
+        // Handle DRF Paginated Response
+        setCourses(coursesData.results || coursesData);
+        setHasMore(coursesData.next !== null);
+
         // 2. Fetch User's Enrolled Courses (from Dashboard endpoint)
-        // We use this to figure out which ones they already own.
         let myIds = new Set();
         if (user) {
             try {
                 const dashboardRes = await client.get('/api/courses/dashboard/stats/');
-                // Assuming dashboardRes.data.enrolled_courses is the list
                 dashboardRes.data.enrolled_courses.forEach(c => myIds.add(c.id));
             } catch (err) {
                 console.warn("Could not fetch enrollment status", err);
             }
         }
-
-        setCourses(coursesRes.data);
         setEnrolledCourseIds(myIds);
 
       } catch (err) {
@@ -47,6 +52,23 @@ const CourseMarketplace = () => {
     fetchData();
   }, [user]);
 
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    try {
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      const coursesData = await fetchCourses(nextPage);
+      
+      setCourses(prev => [...prev, ...(coursesData.results || coursesData)]);
+      setHasMore(coursesData.next !== null);
+      setPage(nextPage);
+    } catch (err) {
+      console.error("Failed to load more courses:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const handleCardClick = (courseId) => {
      navigate(`/courses/${courseId}`);
   };
@@ -57,7 +79,7 @@ const CourseMarketplace = () => {
     <div className="p-8 bg-gray-50 min-h-screen font-sans max-w-7xl mx-auto relative">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4 animate-fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4 animate-fade-in">
         <div>
           <h1 className="text-4xl font-extrabold text-blue-700 tracking-tight flex items-center gap-3">
              Explore Catalog <Rocket size={32} className="text-blue-600" />
@@ -68,6 +90,9 @@ const CourseMarketplace = () => {
           </p>
         </div>
       </div>
+
+      {/* HOT RIGHT NOW SLIDER */}
+      <HotRightNowSlider />
 
       {/* GRID SECTION */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -149,6 +174,29 @@ const CourseMarketplace = () => {
           );
         })}
       </div>
+
+      {/* LOAD MORE BUTTON */}
+      {hasMore && (
+        <div className="mt-12 flex justify-center pb-12">
+          <button 
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="group flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold shadow-sm hover:shadow-md hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingMore ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> 
+                Loading...
+              </span>
+            ) : (
+              <>
+                Load More Courses
+                <ChevronDown size={16} className="group-hover:translate-y-1 transition-transform" />
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

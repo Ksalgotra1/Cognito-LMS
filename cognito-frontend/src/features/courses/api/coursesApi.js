@@ -1,8 +1,14 @@
 import client from '../../../lib/axios';
 
-// Simple GET request to fetch the list
-export const fetchCourses = async () => {
-  const response = await client.get('api/courses/');
+// GET request to fetch the list (Paginated)
+export const fetchCourses = async (page = 1) => {
+  const response = await client.get(`api/courses/?page=${page}`);
+  return response.data;
+};
+
+// Fetch Hot Right Now courses
+export const fetchHotCourses = async () => {
+  const response = await client.get('api/courses/hot/');
   return response.data;
 };
 

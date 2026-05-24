@@ -14,7 +14,8 @@ from .views import (
     get_ai_task_status,
     UserProfileView,
     enroll_course,
-    execute_code
+    execute_code,
+    HotCoursesView
 )
 
 urlpatterns = [
@@ -23,6 +24,7 @@ urlpatterns = [
     
     # --- Course Routes ---
     path('', CourseListCreateView.as_view(), name='course-list-create'),
+    path('hot/', HotCoursesView.as_view(), name='hot-courses'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
     
     # --- Ask AI Routes (Async) ---
