@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'; 
 import { BrowserRouter, Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux'; 
+import { Bell } from 'lucide-react';
 
 // --- Component Imports ---
 import LoginPage from './features/auth/components/LoginPage';
@@ -93,12 +94,17 @@ const MainLayout = () => {
             <SearchBar />
           </div>
 
-          {/* Right: Profile Icon */}
-          <Link to="/profile" className="cursor-pointer hover:scale-105 transition-transform">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold border border-blue-200 shadow-sm">
-                {initials}
-            </div>
-          </Link>
+          {/* Right: Actions & Profile Icon */}
+          <div className="flex items-center gap-4">
+            <button className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9] transition-colors">
+              <Bell size={16} className="text-[#64748b]" />
+            </button>
+            <Link to="/profile" className="cursor-pointer hover:scale-105 transition-transform">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold border border-blue-200 shadow-sm">
+                  {initials}
+              </div>
+            </Link>
+          </div>
         </div>
       </nav>
       

@@ -378,13 +378,13 @@ def generate_certificate(request, course_id):
     )
 
     # QR Code Generation
-    verify_url = f"http://localhost:5173/verify/{cert_obj.certificate_id}"
+    verify_url = f"{settings.FRONTEND_URL}/verify/{cert_obj.certificate_id}"
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(verify_url)
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white")
     qr_buffer = io.BytesIO()
-    qr_img.save(qr_buffer, format="PNG")
+    qr_img.save(qr_buffer)
     qr_buffer.seek(0)
     qr_code_image = ImageReader(qr_buffer)
 

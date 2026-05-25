@@ -38,7 +38,7 @@ const SearchBar = () => {
             setShowDropdown(true);
 
             try {
-                const response = await axios.get(`http://127.0.0.1:8000/api/courses/search/?q=${query}`);
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/courses/search/?q=${query}`);
                 if (!isCancelled) setResults(response.data);
             } catch (error) {
                 console.error("Search Error:", error);

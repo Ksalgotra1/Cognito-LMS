@@ -32,7 +32,7 @@ def get_env_variable(var_name, default=None, required=True):
 # Required environment variables
 SECRET_KEY = get_env_variable('SECRET_KEY', required=True)
 REDIS_URL = get_env_variable('REDIS_URL', default='redis://localhost:6379/0', required=False)
-
+FRONTEND_URL = get_env_variable('FRONTEND_URL', default='http://localhost:5173', required=False)
 
 # Application definition
 

@@ -73,6 +73,33 @@ export const MarketplaceSkeleton = () => (
       <Skeleton className="h-5 w-96" />
     </div>
 
+    {/* Hot Right Now Skeleton */}
+    <div className="mb-12">
+      {/* Slider Title */}
+      <div className="flex items-center gap-2 mb-6">
+        <SkeletonCircle size={7} />
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-6 w-20 rounded-full ml-2" />
+      </div>
+      
+      {/* Hero Carousel Card */}
+      <div className="bg-gradient-to-br from-gray-900 to-black rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[350px] border border-gray-800">
+        {/* Left: Image placeholder */}
+        <div className="md:w-5/12 bg-gray-800 animate-pulse min-h-[200px]" />
+        
+        {/* Right: Content */}
+        <div className="p-8 md:w-7/12 flex flex-col justify-center gap-6">
+          <Skeleton className="h-10 w-3/4 bg-gray-700" />
+          <div className="space-y-3">
+             <Skeleton className="h-5 w-full bg-gray-700" />
+             <Skeleton className="h-5 w-5/6 bg-gray-700" />
+             <Skeleton className="h-5 w-4/6 bg-gray-700" />
+          </div>
+          <Skeleton className="h-12 w-48 rounded-xl bg-gray-700 mt-2" />
+        </div>
+      </div>
+    </div>
+
     {/* Grid — 6 Cards */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {[1, 2, 3, 4, 5, 6].map((i) => (

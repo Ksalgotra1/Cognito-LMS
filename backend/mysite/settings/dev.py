@@ -24,10 +24,11 @@ else:
         }
     }
 
-# CORS: Allow all local dev origins
+# CORS: Explicitly allow frontend origin
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    FRONTEND_URL,
+    FRONTEND_URL.replace('localhost', '127.0.0.1'),
+    FRONTEND_URL.replace('127.0.0.1', 'localhost'),
 ]
 
 # Site URL for certificate QR codes etc.

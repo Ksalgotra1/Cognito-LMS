@@ -2,7 +2,7 @@ import axios from 'axios';
 import { toastEvents } from './toastEvents';
 
 const client = axios.create({
-    baseURL: 'http://127.0.0.1:8000',
+    baseURL: import.meta.env.VITE_BACKEND_URL,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -26,6 +26,11 @@ client.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
+        // Ignore 401 errors from the login or refresh endpoints itself so the UI can display "Wrong password"
+        if (error.response?.status === 401 && originalRequest.url?.includes('api/token/')) {
+            return Promise.reject(error);
+        }
+
         // Only attempt refresh on 401 and if we haven't already retried
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
@@ -35,7 +40,7 @@ client.interceptors.response.use(
                 if (!refreshToken) throw new Error('No refresh token');
 
                 // Request new access token using refresh token
-                const response = await axios.post('http://127.0.0.1:8000/api/token/refresh/', {
+                const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/token/refresh/`, {
                     refresh: refreshToken
                 });
 

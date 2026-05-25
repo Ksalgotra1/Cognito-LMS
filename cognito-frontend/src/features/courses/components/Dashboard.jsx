@@ -134,15 +134,16 @@ const Dashboard = () => {
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-        <div>
-          {/* ✅ UPDATED: Uses First Name if available, otherwise fallback to Username */}
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.first_name || user?.username}!
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-[#1e293b] mb-0.5">
+            Welcome back, {user?.first_name || user?.username}
           </h1>
-          <p className="text-gray-500 mt-1">
-             {activeCourses.length > 0 
-               ? `You have ${activeCourses.length} courses in progress.` 
-               : "All caught up! Check your completed courses below."}
+          <p className="text-sm text-[#64748b]">
+            {activeCourses.length > 0 ? (
+              <>You have <strong className="text-[#2563EB] font-semibold">{activeCourses.length}</strong> courses in progress.</>
+            ) : (
+              "All caught up! Check your completed courses below."
+            )}
           </p>
         </div>
       </div>
