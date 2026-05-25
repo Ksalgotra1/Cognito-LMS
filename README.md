@@ -1,11 +1,6 @@
 # Cognito LMS
 
-**Built with:**
-- **Backend** — Django 6, Django REST Framework, Simple JWT, Celery 5, Redis
-- **Frontend** — React 19, Vite 7, Redux Toolkit, React Router 7, Tailwind CSS
-- **AI / Search** — Ollama (Llama 3), in-memory Trie, RAG pipeline
-- **Infrastructure** — PostgreSQL, Gunicorn, Nginx, Redis Sentinel
-- **Tooling** — ReportLab, Piston API, React Flow, Monaco Editor
+**Built with** Django 6 ▣ React 19 ▣ Redis ▣ Celery ▣ Ollama/Llama 3 ▣ OpenAI
 
 **An intelligent learning management system built on directed acyclic graph (DAG) course dependencies, AI-assisted tutoring, and algorithmic study scheduling.**
 
