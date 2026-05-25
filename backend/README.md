@@ -7,17 +7,22 @@ Django 6 REST API powering the Cognito learning management system.
 ## ■ Table of Contents
 
 | Section | Sub-Sections |
-|---------|--------------|
-| **[Quick Start](#-quick-start)** | - |
-| **[Tech Stack](#-tech-stack)** | - |
-| **[Project Structure](#-project-structure)** | - |
-| **[Data Models](#-data-models)** | - |
-| **[API Endpoints](#-api-endpoints)** | [Rate Limits](#rate-limits) |
-| **[Core Algorithms](#-core-algorithms)** | [DAG Cycle Detection](#dag-cycle-detection) • [Trie Search](#trie-search) • [Greedy Scheduler](#greedy-study-scheduler) • [RAG Context](#rag-context-builder) |
-| **[Celery Tasks](#-celery-tasks)** | - |
-| **[Settings](#-settings)** | - |
-| **[Environment Vars](#-environment-variables)** | - |
-| **[Testing](#-testing)** | - |
+|---|---|
+| **Quick Start** | [Quick Start](#-quick-start) |
+| **Tech Stack** | [Tech Stack](#-tech-stack) |
+| **Project Structure** | [Project Structure](#-project-structure) |
+| **Data Models** | [Data Models](#-data-models) |
+| **API Endpoints** | [API Endpoints](#-api-endpoints) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Rate Limits | [Rate Limits](#rate-limits) |
+| **Core Algorithms** | [Core Algorithms](#-core-algorithms) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ DAG Cycle Detection | [DAG Cycle Detection](#dag-cycle-detection) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Trie Search | [Trie Search](#trie-search) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Greedy Scheduler | [Greedy Scheduler](#greedy-study-scheduler) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ RAG Context | [RAG Context Builder](#rag-context-builder) |
+| **Celery Tasks** | [Celery Tasks](#-celery-tasks) |
+| **Settings** | [Settings](#-settings) |
+| **Environment Vars** | [Environment Variables](#-environment-variables) |
+| **Testing** | [Testing](#-testing) |
 
 ---
 

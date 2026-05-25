@@ -7,12 +7,18 @@ React 19 single-page application for the Cognito learning management system.
 ## ■ Table of Contents
 
 | Section | Sub-Sections |
-|---------|--------------|
-| **[Quick Start](#-quick-start)** | - |
-| **[Tech Stack](#-tech-stack)** | - |
-| **[Architecture](#-architecture)** | [Feature-Sliced](#design-pattern-feature-sliced) • [Component Hierarchy](#component-hierarchy) • [State Management](#state-management) • [API Layer](#api-layer) • [Skeleton Loading](#skeleton-loading) • [Search](#search-frontend) |
-| **[Key Components](#-key-components)** | - |
-| **[Environment](#-environment)** | - |
+|---|---|
+| **Quick Start** | [Quick Start](#-quick-start) |
+| **Tech Stack** | [Tech Stack](#-tech-stack) |
+| **Architecture** | [Architecture](#-architecture) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Feature-Sliced | [Design Pattern: Feature-Sliced](#design-pattern-feature-sliced) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Component Hierarchy | [Component Hierarchy](#component-hierarchy) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ State Management | [State Management](#state-management) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ API Layer | [API Layer](#api-layer) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Skeleton Loading | [Skeleton Loading](#skeleton-loading) |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ Search | [Search (Frontend)](#search-frontend) |
+| **Key Components** | [Key Components](#-key-components) |
+| **Environment** | [Environment](#-environment) |
 
 ---
 
