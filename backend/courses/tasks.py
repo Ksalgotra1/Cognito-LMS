@@ -35,9 +35,12 @@ def generate_ai_response_task(course_id, user_id, user_question):
         print(f"🧠 [Celery] Building RAG context for course {course_id}...")
         system_prompt = get_rag_context(course_id, user)
         
-        # 2. Call LLM (This can take 5-10 seconds)
-        print(f"🤖 [Celery] Calling Llama 3 for user {user_id}...")
-        ai_answer = get_chat_response(system_prompt, user_question)
+        # 2. Apply Structural Boundary Defense (Prompt Boxing)
+        safe_user_question = f"<user_input>\n{user_question}\n</user_input>"
+        
+        # 3. Call LLM (This can take 5-10 seconds)
+        print(f"🤖 [Celery] Calling AI Provider for user {user_id}...")
+        ai_answer = get_chat_response(system_prompt, safe_user_question)
         
         print(f"✅ [Celery] AI response generated successfully!")
         return {"status": "success", "answer": ai_answer}

@@ -116,9 +116,14 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'user': '100/hour',
         'ai': '10/minute',
+        'ai_anon': '3/minute',
         'search': '200/minute',
     }
 }
+
+# --- INFRASTRUCTURE DEFENSE ---
+# Reject payloads larger than 1MB before parsing (protects against memory exhaustion)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1048576
 
 # Simple JWT
 SIMPLE_JWT = {

@@ -20,7 +20,7 @@ from django.utils.decorators import method_decorator
 from django.core.cache import cache
 
 from rest_framework import generics, permissions, status
-from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -590,6 +590,10 @@ class AIThrottle(UserRateThrottle):
     """Custom throttle for expensive AI endpoints."""
     scope = 'ai'
 
+class AIAnonThrottle(AnonRateThrottle):
+    """Custom IP-based throttle for botnet defense before auth checks."""
+    scope = 'ai_anon'
+
 class AskAIView(APIView):
     """
     Async AI Tutor Endpoint.
@@ -598,14 +602,53 @@ class AskAIView(APIView):
     3. Frontend polls for result via get_ai_task_status
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIThrottle]
+    throttle_classes = [AIAnonThrottle, AIThrottle]
 
     def post(self, request, course_id):
         user_question = request.data.get('question')
         if not user_question:
             return Response({"error": "Question is required"}, status=400)
 
-        # ⚡️ FIRE AND (almost) FORGET
+        # Security: Input sanitization and length check
+        user_question = str(user_question).strip()
+        if len(user_question) > 1000:
+            return Response({"error": "Question exceeds maximum length of 1000 characters"}, status=400)
+            
+        # Security: Enforce strictly English text (ASCII only) to prevent obfuscation
+        if not user_question.isascii():
+            return Response({"error": "Only English characters are allowed in the prompt"}, status=400)
+
+        # Security: Basic prompt injection protection and network defense
+        suspicious_patterns = [
+            # Prompt Injection
+            "ignore previous",
+            "ignore all instructions",
+            "system prompt",
+            "forget everything",
+            "you are now",
+            "bypass instructions",
+            "developer mode",
+            "disregard",
+            "override",
+            "act as a",
+            "do anything now",
+            
+            # Network / XSS / Injection Defense
+            "<script",
+            "javascript:",
+            "exec(",
+            "eval(",
+            "import os",
+            "import sys",
+            "__subclasses__",
+            "http://",
+            "https://"
+        ]
+        question_lower = user_question.lower()
+        if any(pattern in question_lower for pattern in suspicious_patterns):
+            return Response({"error": "Invalid prompt content detected"}, status=400)
+
+        # FIRE AND (almost) FORGET
         # Start the Celery task and return immediately
         from .tasks import generate_ai_response_task
         task = generate_ai_response_task.delay(
