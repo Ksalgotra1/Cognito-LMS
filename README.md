@@ -1,10 +1,11 @@
 # Cognito LMS
 
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)
-![Django](https://img.shields.io/badge/Django-6.0-092E20?style=flat&logo=django&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=black)
-![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat)
+**Built with:**
+- **Backend** — Django 6, Django REST Framework, Simple JWT, Celery 5, Redis
+- **Frontend** — React 19, Vite 7, Redux Toolkit, React Router 7, Tailwind CSS
+- **AI / Search** — Ollama (Llama 3), in-memory Trie, RAG pipeline
+- **Infrastructure** — PostgreSQL, Gunicorn, Nginx, Redis Sentinel
+- **Tooling** — ReportLab, Piston API, React Flow, Monaco Editor
 
 **An intelligent learning management system built on directed acyclic graph (DAG) course dependencies, AI-assisted tutoring, and algorithmic study scheduling.**
 
