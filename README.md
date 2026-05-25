@@ -429,7 +429,7 @@ A visitor arrives at the platform and is presented with login or registration. A
 
 ### 2. Course Marketplace
 
-After login, the student navigates to `/browse` to see all available courses in a grid. Each card displays the title, description, instructor name, and an "Enrolled" badge if the student is already registered. The marketplace is accessible to both authenticated and unauthenticated users.
+After login, the student navigates to `/browse` to see all available courses in a grid. Each card displays the title, description, instructor name, and an "Enrolled" badge if the student is already registered. The marketplace is accessible to both authenticated and unauthenticated users, and features seamless, continuous pagination allowing users to efficiently browse large catalogs without full page reloads.
 
 ### 3. Enrollment
 
@@ -631,6 +631,9 @@ cat > backend/.env << EOF
 SECRET_KEY=your-secret-key-here
 REDIS_URL=redis://localhost:6379/0
 DJANGO_SETTINGS_MODULE=mysite.settings.dev
+FRONTEND_URL=http://localhost:5173
+AI_PROVIDER=openai
+AI_API_KEY=your-openai-key
 EOF
 
 # Run migrations
@@ -704,6 +707,11 @@ cd cognito-frontend
 
 # Install dependencies
 npm install
+
+# Create environment file
+cat > .env << EOF
+VITE_BACKEND_URL=http://127.0.0.1:8000
+EOF
 
 # Start development server
 npm run dev
