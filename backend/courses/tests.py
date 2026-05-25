@@ -222,7 +222,7 @@ class CourseAPITest(BaseTestMixin, TestCase):
         """Course list should be accessible without authentication."""
         response = self.client.get('/api/courses/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_create_course_authenticated(self):
         """Authenticated users can create courses."""

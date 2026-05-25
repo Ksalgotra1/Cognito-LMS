@@ -266,3 +266,10 @@ python manage.py test courses -v 2
 | `CertificateVerifyTest` | Valid UUID (200), invalid (404) |
 | `DashboardAPITest` | Enrolled courses, progress updates |
 | `LessonCompletionTest` | Toggle on/off |
+
+### Coverage Report
+- **Overall Coverage**: 74% (1238 statements)
+- **Core Logic & Search (`utils.py`)**: 98%
+- **Models**: 89%
+- **Serializers**: 88%
+- **Views**: 54%
