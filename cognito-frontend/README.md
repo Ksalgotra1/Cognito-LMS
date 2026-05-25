@@ -5,17 +5,14 @@ React 19 single-page application for the Cognito learning management system.
 ---
 
 ## ■ Table of Contents
-- [Quick Start](#-quick-start)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-  - [Design Pattern: Feature-Sliced](#design-pattern-feature-sliced)
-  - [Component Hierarchy](#component-hierarchy)
-  - [State Management](#state-management)
-  - [API Layer](#api-layer)
-  - [Skeleton Loading](#skeleton-loading)
-  - [Search (Frontend)](#search-frontend)
-- [Key Components](#-key-components)
-- [Environment](#-environment)
+
+| Section | Sub-Sections |
+|---------|--------------|
+| **[Quick Start](#-quick-start)** | - |
+| **[Tech Stack](#-tech-stack)** | - |
+| **[Architecture](#-architecture)** | [Feature-Sliced](#design-pattern-feature-sliced) • [Component Hierarchy](#component-hierarchy) • [State Management](#state-management) • [API Layer](#api-layer) • [Skeleton Loading](#skeleton-loading) • [Search](#search-frontend) |
+| **[Key Components](#-key-components)** | - |
+| **[Environment](#-environment)** | - |
 
 ---
 

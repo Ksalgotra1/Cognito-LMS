@@ -5,65 +5,21 @@
 ---
 
 ## ■ Table of Contents
-- [Overview](#-overview)
-- [Demo](#-demo)
-- [Tech Stack](#-tech-stack)
-  - [Documentation](#documentation)
-- [System Architecture](#-system-architecture)
-  - [High-Level Request Flow](#high-level-request-flow)
-  - [Database Schema](#database-schema)
-  - [Search Architecture (2-Layer Pipeline)](#search-architecture-2-layer-pipeline)
-  - [DAG Validation Flow](#dag-validation-flow)
-  - [RAG Context Builder (services.py)](#rag-context-builder-servicespy)
-  - [Study Scheduler (Greedy First-Fit Algorithm)](#study-scheduler-greedy-first-fit-algorithm)
-  - [Certificate Generation and Verification](#certificate-generation-and-verification)
-  - [AI Tutor Interaction Lifecycle](#ai-tutor-interaction-lifecycle)
-- [Architecture Workflow (User Journey)](#-architecture-workflow-user-journey)
-  - [1. Landing and Authentication](#1-landing-and-authentication)
-  - [2. Course Marketplace](#2-course-marketplace)
-  - [3. Enrollment](#3-enrollment)
-  - [4. DAG Visualization](#4-dag-visualization)
-  - [5. Study Scheduler](#5-study-scheduler)
-  - [6. AI Tutor](#6-ai-tutor)
-  - [7. Code Lab](#7-code-lab)
-  - [8. Certificate Generation](#8-certificate-generation)
-  - [9. Public Verification](#9-public-verification)
-- [Core Engineering Highlights](#-core-engineering-highlights)
-  - [DAG with Cycle Detection (Acyclic Enforcement)](#-dag-with-cycle-detection-acyclic-enforcement)
-  - [Greedy Study Scheduler](#-greedy-study-scheduler)
-  - [2-Layer Search (Trie + AI Fallback)](#-2-layer-search-trie--ai-fallback)
-  - [Redis + Celery Async Orchestration](#-redis--celery-async-orchestration)
-  - [Transient Caching (RAG Context)](#-transient-caching-rag-context)
-  - [In-Memory Trie (RAM-Resident Search)](#-in-memory-trie-ram-resident-search)
-  - [Course Marketplace Architecture](#-course-marketplace-architecture)
-  - [Learning Library (Sorted by Last Edited)](#-learning-library-sorted-by-last-edited)
-  - [UUID-Based Certificate System](#-uuid-based-certificate-system)
-  - [Public Certificate Verification Route](#-public-certificate-verification-route)
-- [Folder Structure](#-folder-structure)
-  - [Frontend (cognito-frontend/src/)](#frontend-cognito-frontendsrc)
-  - [Backend (backend/)](#backend-backend)
-- [Installation Guide](#-installation-guide)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Redis Setup](#redis-setup)
-  - [Celery Worker Setup](#celery-worker-setup)
-  - [AI Provider Setup](#ai-provider-setup)
-  - [Frontend Setup](#frontend-setup)
-  - [Environment Variables Reference](#environment-variables-reference)
-- [Deployment Architecture](#-deployment-architecture)
-  - [Scaling Strategy](#scaling-strategy)
-  - [Redis Scaling Considerations](#redis-scaling-considerations)
-  - [Database Considerations](#database-considerations)
-- [Security Considerations](#-security-considerations)
-  - [Authentication](#authentication)
-  - [Certificate Verification Security](#certificate-verification-security)
-  - [Input Validation](#input-validation)
-  - [Cache Safety](#cache-safety)
-  - [Production Hardening](#production-hardening)
-- [Future Improvements](#-future-improvements)
-  - [Bayesian-GNN Hybrid Failure Predictor](#bayesian-gnn-hybrid-failure-predictor)
-  - [Additional Technical Improvements](#additional-technical-improvements)
-- [Running Tests](#-running-tests)
+
+| Section | Sub-Sections |
+|---------|--------------|
+| **[Overview](#-overview)** | - |
+| **[Demo](#-demo)** | - |
+| **[Tech Stack](#-tech-stack)** | [Documentation](#documentation) |
+| **[System Architecture](#-system-architecture)** | [Request Flow](#high-level-request-flow) • [Database Schema](#database-schema) • [Search (2-Layer)](#search-architecture-2-layer-pipeline) • [DAG Validation](#dag-validation-flow) • [RAG Builder](#rag-context-builder-servicespy) • [Study Scheduler](#study-scheduler-greedy-first-fit-algorithm) • [Certificate Gen](#certificate-generation-and-verification) • [AI Tutor Flow](#ai-tutor-interaction-lifecycle) |
+| **[User Journey](#-architecture-workflow-user-journey)** | [1. Landing/Auth](#1-landing-and-authentication) • [2. Marketplace](#2-course-marketplace) • [3. Enrollment](#3-enrollment) • [4. DAG Vis](#4-dag-visualization) • [5. Scheduler](#5-study-scheduler) • [6. AI Tutor](#6-ai-tutor) • [7. Code Lab](#7-code-lab) • [8. Certificate](#8-certificate-generation) • [9. Verify](#9-public-verification) |
+| **[Engineering](#-core-engineering-highlights)** | [DAG/Acyclic](#-dag-with-cycle-detection-acyclic-enforcement) • [Greedy Scheduler](#-greedy-study-scheduler) • [2-Layer Search](#-2-layer-search-trie--ai-fallback) • [Redis+Celery](#-redis--celery-async-orchestration) • [Transient Cache](#-transient-caching-rag-context) • [In-Memory Trie](#-in-memory-trie-ram-resident-search) • [Marketplace](#-course-marketplace-architecture) • [Learning Library](#-learning-library-sorted-by-last-edited) • [UUID Certs](#-uuid-based-certificate-system) • [Public Verify](#-public-certificate-verification-route) |
+| **[Folder Structure](#-folder-structure)** | [Frontend](#frontend-cognito-frontendsrc) • [Backend](#backend-backend) |
+| **[Installation](#-installation-guide)** | [Prerequisites](#prerequisites) • [Backend](#backend-setup) • [Redis](#redis-setup) • [Celery](#celery-worker-setup) • [AI Provider](#ai-provider-setup) • [Frontend](#frontend-setup) • [Env Vars](#environment-variables-reference) |
+| **[Deployment](#-deployment-architecture)** | [Scaling](#scaling-strategy) • [Redis Scaling](#redis-scaling-considerations) • [Database](#database-considerations) |
+| **[Security](#-security-considerations)** | [Authentication](#authentication) • [Cert Security](#certificate-verification-security) • [Input Validation](#input-validation) • [Cache Safety](#cache-safety) • [Prod Hardening](#production-hardening) |
+| **[Future Work](#-future-improvements)** | [Bayesian-GNN](#bayesian-gnn-hybrid-failure-predictor) • [Tech Improvements](#additional-technical-improvements) |
+| **[Tests](#-running-tests)** | - |
 
 ---
 

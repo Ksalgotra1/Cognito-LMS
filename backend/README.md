@@ -5,21 +5,19 @@ Django 6 REST API powering the Cognito learning management system.
 ---
 
 ## ■ Table of Contents
-- [Quick Start](#-quick-start)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Data Models](#-data-models)
-- [API Endpoints](#-api-endpoints)
-  - [Rate Limits](#rate-limits)
-- [Core Algorithms](#-core-algorithms)
-  - [DAG Cycle Detection](#dag-cycle-detection)
-  - [Trie Search](#trie-search)
-  - [Greedy Study Scheduler](#greedy-study-scheduler)
-  - [RAG Context Builder](#rag-context-builder)
-- [Celery Tasks](#-celery-tasks)
-- [Settings](#-settings)
-- [Environment Variables](#-environment-variables)
-- [Testing](#-testing)
+
+| Section | Sub-Sections |
+|---------|--------------|
+| **[Quick Start](#-quick-start)** | - |
+| **[Tech Stack](#-tech-stack)** | - |
+| **[Project Structure](#-project-structure)** | - |
+| **[Data Models](#-data-models)** | - |
+| **[API Endpoints](#-api-endpoints)** | [Rate Limits](#rate-limits) |
+| **[Core Algorithms](#-core-algorithms)** | [DAG Cycle Detection](#dag-cycle-detection) • [Trie Search](#trie-search) • [Greedy Scheduler](#greedy-study-scheduler) • [RAG Context](#rag-context-builder) |
+| **[Celery Tasks](#-celery-tasks)** | - |
+| **[Settings](#-settings)** | - |
+| **[Environment Vars](#-environment-variables)** | - |
+| **[Testing](#-testing)** | - |
 
 ---
 
