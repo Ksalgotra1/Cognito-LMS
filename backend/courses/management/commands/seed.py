@@ -441,10 +441,10 @@ class Command(BaseCommand):
                 cat_courses[4].prerequisites.add(cat_courses[3])
                 # Second chain
                 cat_courses[6].prerequisites.add(cat_courses[5])
-                # Diamond dependency: [7] requires both [5] and [6]
+                # [7] only requires [5] — NOT [6], to avoid illogical cross-dependencies
+                # (e.g. "Database Migrations" does NOT require "Graph Databases with Neo4j")
                 cat_courses[7].prerequisites.add(cat_courses[5])
-                cat_courses[7].prerequisites.add(cat_courses[6])
-                prereq_count += 7
+                prereq_count += 6
         self.stdout.write(self.style.SUCCESS(f"   ✅ {prereq_count} prerequisite edges linked (multi-level DAG).\n"))
 
         # ── 5. Enrollments ────────────────────────────────────────────
