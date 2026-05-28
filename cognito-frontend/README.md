@@ -149,7 +149,7 @@ Four page-specific skeleton compositions mirror exact target layouts:
 | Component | Responsibility |
 |-----------|---------------|
 | `CourseDetail.jsx` | Sidebar with lock/unlock state, video tab, coding lab + AI tab, DAG tab, study plan |
-| `CourseGraph.jsx` | React Flow 3-level DAG (grandparents, parents, target course) |
+| `CourseGraph.jsx` | React Flow DAG — nodes colored by completion status (completed/current/available/locked), precomputed via 2-query aggregate in the view |
 | `AiTutor.jsx` | RAG-powered chat with Celery polling, copy-to-clipboard |
 | `CodeEditor.jsx` | Monaco Editor + Piston backend proxy, terminal output panel |
 | `StudyPlanModal.jsx` | 3-step wizard: availability input, loading spinner, timeline results |

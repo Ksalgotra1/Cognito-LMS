@@ -512,7 +512,7 @@ Clicking a non-enrolled course opens the detail page with locked content (video 
 
 ### 4. DAG Visualization
 
-The "Prerequisites" tab renders a React Flow graph. Enrolled users see an interactive 3-level DAG (grandparents, parents, current course). Non-enrolled users see a simplified prerequisite list. Edges are animated with directional arrows.
+The course detail page renders an interactive React Flow graph. Nodes are color-coded by completion status: completed (blue filled), current (dark filled), available (white with blue border), locked (grey). Edge strokes follow the same scheme. Node status is precomputed in the view using 2 aggregate DB queries and passed to the serializer as a `{course_id: is_completed}` map, giving O(1) lookups per node. A legend is rendered below the graph.
 
 ### 5. Study Scheduler
 
