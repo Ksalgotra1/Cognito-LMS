@@ -53,7 +53,7 @@ const StudyPlanModal = ({ courseId, onClose }) => {
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">AI Study Scheduler</h2>
+              <h2 className="text-lg font-bold text-gray-900">Study Scheduler</h2>
               <p className="text-xs text-gray-500">Optimized via Greedy Allocation Algorithm</p>
             </div>
           </div>
@@ -159,7 +159,7 @@ const StudyPlanModal = ({ courseId, onClose }) => {
                     
                     {/* Timeline Dot */}
                     <div className="relative flex flex-col items-center pt-2 z-10">
-                      <div className="w-3 h-3 rounded-full bg-white border-2 border-indigo-600 group-hover:scale-125 transition-transform shadow-sm"></div>
+                      <div className={`w-2.5 h-2.5 rounded-full mt-1.5 ${new Date(day.date).toDateString() === new Date().toDateString() ? 'bg-[#2563EB]' : 'border-2 border-[#2563EB]'}`} />
                     </div>
 
                     {/* Lessons Card */}
@@ -195,8 +195,9 @@ const StudyPlanModal = ({ courseId, onClose }) => {
         {/* FOOTER */}
         <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
           {step === 3 ? (
-            <button onClick={onClose} className="px-6 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-black font-medium transition flex items-center gap-2 shadow-lg shadow-gray-200">
-              Start Learning <ArrowRight className="w-4 h-4" />
+            <button onClick={onClose} className="flex items-center gap-2 bg-[#2563EB] text-white text-[13px] font-semibold px-6 py-2.5 rounded-[9px] hover:bg-[#1D4ED8] transition-colors">
+              Start Learning
+              <ArrowRight size={14} />
             </button>
           ) : (
             <>
