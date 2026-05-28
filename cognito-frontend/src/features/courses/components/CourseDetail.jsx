@@ -15,6 +15,7 @@ import AiTutor from './AiTutor';
 import CodeEditor from '../../../components/ui/CodeEditor';
 import { useToast } from '../../../components/ui/Toast'; 
 import { CourseDetailSkeleton } from '../../../components/ui/Skeletons';
+import ReactMarkdown from 'react-markdown';
 
 const CourseDetail = () => {
   const { id } = useParams();
@@ -232,7 +233,11 @@ const CourseDetail = () => {
 
             <div className="flex gap-6 border-b border-gray-200">
               <button onClick={() => setActiveTab('video')} className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'video' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                <Video size={18} /> Video Lesson
+                {getYouTubeId(activeLesson.content) ? (
+                  <><Video size={18} /> Video Lesson</>
+                ) : (
+                  <><FileText size={18} /> Text Lesson</>
+                )}
               </button>
               <button disabled={!isEnrolled} onClick={() => setActiveTab('lab')} className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'lab' ? 'border-indigo-600 text-indigo-600' : !isEnrolled ? 'border-transparent text-gray-300 cursor-not-allowed' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                 <Code size={18} /> {isEnrolled ? "Coding Lab & AI" : <span className="flex items-center gap-1">Coding Lab <Lock size={10}/></span>}
@@ -242,26 +247,40 @@ const CourseDetail = () => {
             {activeTab === 'video' ? (
               <div className="animate-in fade-in duration-300 space-y-8">
                 
-                {/* VIDEO / LOCKED OVERLAY */}
-                <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-black/10 relative group">
-                  {isEnrolled ? (
-                    getYouTubeId(activeLesson.content) ? (
-                      <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.content)}`} title={activeLesson.title} allowFullScreen className="w-full h-full border-0"></iframe>
+                {/* VIDEO / LOCKED OVERLAY OR TEXT LABEL */}
+                {(!isEnrolled || getYouTubeId(activeLesson.content)) ? (
+                  <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-black/10 relative group">
+                    {isEnrolled ? (
+                        <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.content)}`} title={activeLesson.title} allowFullScreen className="w-full h-full border-0"></iframe>
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-900">
-                        <FileText className="w-16 h-16 mb-4 opacity-50" />
-                        <p className="font-medium text-lg text-gray-300">Text-based Lesson</p>
+                      <div className="absolute inset-0 bg-gray-900/95 flex flex-col items-center justify-center text-center p-6 z-20 backdrop-blur-sm">
+                          <div className="bg-gray-800 p-4 rounded-full mb-4 ring-1 ring-gray-700"><Lock size={40} className="text-gray-400" /></div>
+                          <h2 className="text-2xl font-bold text-white mb-2">Lesson Locked</h2>
+                          <p className="text-gray-400 mb-6 max-w-md">Enroll in <strong>{course.title}</strong> to access content.</p>
+                          <button onClick={handleEnroll} disabled={enrolling} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-blue-500/30 transition-transform hover:scale-105">{enrolling ? "Processing..." : "Unlock Full Course"}</button>
                       </div>
-                    )
-                  ) : (
-                    <div className="absolute inset-0 bg-gray-900/95 flex flex-col items-center justify-center text-center p-6 z-20 backdrop-blur-sm">
-                        <div className="bg-gray-800 p-4 rounded-full mb-4 ring-1 ring-gray-700"><Lock size={40} className="text-gray-400" /></div>
-                        <h2 className="text-2xl font-bold text-white mb-2">Lesson Locked</h2>
-                        <p className="text-gray-400 mb-6 max-w-md">Enroll in <strong>{course.title}</strong> to access content.</p>
-                        <button onClick={handleEnroll} disabled={enrolling} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-blue-500/30 transition-transform hover:scale-105">{enrolling ? "Processing..." : "Unlock Full Course"}</button>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2 px-1 mb-5">
+                      <FileText size={14} className="text-[#94a3b8]" />
+                      <span className="text-[12px] text-[#94a3b8] font-medium uppercase tracking-widest">
+                        Text-based lesson
+                      </span>
                     </div>
-                  )}
-                </div>
+                    {/* Render Text Lesson Content Directly Here */}
+                    <div className="prose prose-slate max-w-none text-[15px] leading-relaxed w-full text-gray-800 mb-8">
+                        <ReactMarkdown 
+                            components={{
+                                a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium" />
+                            }}
+                        >
+                            {activeLesson.content}
+                        </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
 
                 {/* CONTROLS (Only if Enrolled) */}
                 {isEnrolled && (
@@ -283,13 +302,25 @@ const CourseDetail = () => {
                 )}
 
                 {/* NOTES AREA (Visible to everyone - shows "Locked" text if not enrolled) */}
-                <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200/60 prose prose-indigo max-w-none">
-                   <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4"><FileText className="w-5 h-5 text-gray-400" /> Lesson Notes</h3>
-                   <div className="text-gray-600 leading-relaxed whitespace-pre-wrap flex items-center gap-2">
-                       {!isEnrolled && <Lock size={16} className="text-gray-400"/>}
-                       {getYouTubeId(activeLesson.content) ? "Watch the video above to master this concept." : activeLesson.content}
-                   </div>
-                </div>
+                {/* For text-based lessons, the content is rendered above. For videos, we render notes here. */}
+                {getYouTubeId(activeLesson.content) && (
+                  <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200/60 prose prose-indigo max-w-none">
+                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4"><FileText className="w-5 h-5 text-gray-400" /> Lesson Notes</h3>
+                     <div className="text-gray-600 leading-relaxed flex items-start gap-3">
+                         {!isEnrolled && <Lock size={16} className="text-gray-400 mt-1 flex-shrink-0"/>}
+                         <div className="prose prose-slate max-w-none text-[14px] leading-relaxed w-full">
+                             <ReactMarkdown 
+                                 components={{
+                                     a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium" />
+                                 }}
+                             >
+                                 {/* Auto-linkify raw youtube URLs if they aren't already markdown links */}
+                                 {activeLesson.content.replace(/(^|\s)(https?:\/\/(www\.)?(youtube\.com|youtu\.be)[^\s]+)/g, '$1[$2]($2)')}
+                             </ReactMarkdown>
+                         </div>
+                     </div>
+                  </div>
+                )}
 
                 {/* DEPENDENCY GRAPH (Always Visible) */}
                 {course.prerequisites && course.prerequisites.length > 0 && (
