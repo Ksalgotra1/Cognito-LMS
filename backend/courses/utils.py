@@ -81,9 +81,12 @@ def generate_study_schedule(start_date, target_date, weekly_availability, lesson
     # 2. The Allocation Loop
     while lesson_idx < total_lessons:
         
+        if current_date > target_date:
+            raise ValueError(f"Cannot fit all lessons by {target_date.strftime('%b %d, %Y')}. Please extend your target date or increase your daily availability.")
+
         # Safety Break: Don't schedule past 1 year
         if (current_date - start_date).days > 365:
-            break
+            raise ValueError("Schedule exceeds 1 year maximum limit.")
 
         # A. Get availability for this day
         day_name = current_date.strftime("%a") # "Mon", "Tue"...

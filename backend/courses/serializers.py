@@ -80,36 +80,46 @@ class CourseSerializer(serializers.ModelSerializer):
         return round((completed_lessons / total_lessons) * 100)
     
     def get_prerequisites(self, obj):
-        # Optimization: We use list comprehension instead of .values()
-        # This ensures we use the pre-fetched objects from memory (prefetch_related)
         return [{'id': p.id, 'title': p.title} for p in obj.prerequisites.all()]
 
     def get_recursive_prerequisites(self, obj):
-        """
-        Returns a nested list for the DAG Graph:
-        [
-          { 
-            id: 1, title: 'Parent', 
-            prerequisites: [ { id: 2, title: 'Grandparent' } ] 
-          }
-        ]
-        """
+        """Returns nested prerequisite tree with per-node completion status."""
+        completion_map = self.context.get('prereq_completion_map', {})
+
+
+        def node_status(course_id, own_completed, prereqs_all_completed):
+            """Derive status from precomputed booleans."""
+            if own_completed:
+                return 'completed'
+            if prereqs_all_completed:
+                return 'available'   # prerequisites done, ready to start
+            return 'locked'          # blocked by an incomplete prerequisite
+
         tree = []
-        # Uses .all() to leverage the 'prefetch_related' from the View
         for parent in obj.prerequisites.all():
-            parent_data = {
+            parent_completed = completion_map.get(parent.id, False)
+
+            grandparents = []
+            all_gps_done = True
+            for gp in parent.prerequisites.all():
+                gp_completed = completion_map.get(gp.id, False)
+                if not gp_completed:
+                    all_gps_done = False
+                grandparents.append({
+                    'id': gp.id,
+                    'title': gp.title,
+                    'status': 'completed' if gp_completed else 'available',
+                    'prerequisites': []
+                })
+
+            tree.append({
                 'id': parent.id,
                 'title': parent.title,
-                'prerequisites': [] 
-            }
-            # Fetch the Grandparents (Prerequisites of the Prerequisite)
-            for grandparent in parent.prerequisites.all():
-                parent_data['prerequisites'].append({
-                    'id': grandparent.id,
-                    'title': grandparent.title
-                })
-            tree.append(parent_data)
+                'status': node_status(parent.id, parent_completed, all_gps_done),
+                'prerequisites': grandparents
+            })
         return tree
+
     
 class ChoiceSerializer(serializers.ModelSerializer):
     class Meta:

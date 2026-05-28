@@ -78,45 +78,70 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        
-        # 1. 🔥 CACHE WARMER (Predictive Loading) 🔥
-        # We force the "Heavy Lifting" (Grandparent DAG calculation) to happen 
-        # right now, while the user is reading the course title.
+
         try:
             get_rag_context(instance.id, request.user)
-            # print(f"🔥 [Cache Warmer] Pre-loaded DAG for Course {instance.id}")
         except Exception:
-            pass # Silently fail if Redis is down
-
-        # 2. ⚡️ N+1 QUERY OPTIMIZATION ⚡️
-        # Fetch ALL completed lesson IDs for this user & course in ONE query.
-        # This prevents the serializer from hitting the DB for every single lesson.
+            pass
+        
+        # Prefetch completed lesson IDs
         completed_lesson_ids = set()
         if request.user.is_authenticated:
             completed_lesson_ids = set(
                 UserProgress.objects.filter(
-                    user=request.user, 
-                    lesson__module__course=instance, 
+                    user=request.user,
+                    lesson__module__course=instance,
                     is_completed=True
                 ).values_list('lesson_id', flat=True)
             )
 
-        # 3. Get Serialized Data with Optimized Context
-        # We pass the pre-fetched set to the serializer context
+        # Prerequisite completion map: 2 aggregate queries, O(1) lookups in serializer
+        prereq_completion_map = {}
+        if request.user.is_authenticated:
+            all_prereq_ids = set()
+            for parent in instance.prerequisites.all():
+                all_prereq_ids.add(parent.id)
+                for gp in parent.prerequisites.all():
+                    all_prereq_ids.add(gp.id)
+
+            if all_prereq_ids:
+                from django.db.models import Count
+                total_map = {
+                    row['module__course_id']: row['total']
+                    for row in Lesson.objects
+                        .filter(module__course_id__in=all_prereq_ids)
+                        .values('module__course_id')
+                        .annotate(total=Count('id'))
+                }
+                done_map = {
+                    row['lesson__module__course_id']: row['done']
+                    for row in UserProgress.objects
+                        .filter(
+                            user=request.user,
+                            lesson__module__course_id__in=all_prereq_ids,
+                            is_completed=True
+                        )
+                        .values('lesson__module__course_id')
+                        .annotate(done=Count('id'))
+                }
+                for cid in all_prereq_ids:
+                    total = total_map.get(cid, 0)
+                    done = done_map.get(cid, 0)
+                    prereq_completion_map[cid] = total > 0 and done >= total
+
         context = self.get_serializer_context()
         context['completed_lesson_ids'] = completed_lesson_ids
-        
+        context['prereq_completion_map'] = prereq_completion_map
+
         serializer = self.get_serializer(instance, context=context)
         data = serializer.data
 
-        # 4. 🔒 LOCKING LOGIC 🔒
-        # Check if the user is enrolled
+        # Check enrollment and inject into response
         user = request.user
         is_enrolled = False
         if user.is_authenticated:
             is_enrolled = Enrollment.objects.filter(student=user, course=instance).exists()
-        
-        # Inject Enrollment Status into response
+
         data['is_enrolled'] = is_enrolled
 
         # Iterate through modules/lessons to lock content if not enrolled
@@ -570,7 +595,10 @@ class GenerateStudyPlanView(APIView):
         start_date = timezone.now().date()
         target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
         
-        schedule = generate_study_schedule(start_date, target_date, availability, lessons)
+        try:
+            schedule = generate_study_schedule(start_date, target_date, availability, lessons)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
         
         plan, created = StudyPlan.objects.update_or_create(
             user=user,
