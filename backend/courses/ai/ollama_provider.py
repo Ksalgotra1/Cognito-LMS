@@ -38,10 +38,14 @@ class OllamaProvider(AIProvider):
         FALLBACK: Returns a mock response if Llama is offline.
         """
         try:
-            response = ollama.chat(model=self.model, messages=[
-                {'role': 'system', 'content': system_context},
-                {'role': 'user', 'content': user_question},
-            ])
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {'role': 'system', 'content': system_context},
+                    {'role': 'user', 'content': user_question},
+                ],
+                options={'timeout': 20},  # Hard cap: 20s network wait
+            )
             return response['message']['content']
         except Exception as e:
             # Fallback Mechanism (The "Safety Net")
@@ -55,10 +59,14 @@ class OllamaProvider(AIProvider):
         Translates vague user intent (e.g., "how to style") -> Technical Keywords (e.g., ["CSS"]).
         """
         try:
-            response = ollama.chat(model=self.model, messages=[
-                {'role': 'system', 'content': KEYWORD_SYSTEM_PROMPT},
-                {'role': 'user', 'content': user_query},
-            ])
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {'role': 'system', 'content': KEYWORD_SYSTEM_PROMPT},
+                    {'role': 'user', 'content': user_query},
+                ],
+                options={'timeout': 15},  # Keyword extraction: tighter cap
+            )
 
             content = response['message']['content']
 

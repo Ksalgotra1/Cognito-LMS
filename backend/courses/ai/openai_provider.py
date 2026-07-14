@@ -51,6 +51,7 @@ class OpenAIProvider(AIProvider):
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
+                timeout=20,  # Hard cap: 20s for chat responses
                 messages=[
                     {"role": "system", "content": system_context},
                     {"role": "user", "content": user_question},
@@ -71,6 +72,7 @@ class OpenAIProvider(AIProvider):
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
+                timeout=15,  # Keyword extraction: tighter cap
                 messages=[
                     {"role": "system", "content": KEYWORD_SYSTEM_PROMPT},
                     {"role": "user", "content": user_query},
