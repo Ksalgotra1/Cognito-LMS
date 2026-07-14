@@ -113,11 +113,14 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 24,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+    ],
     'DEFAULT_THROTTLE_RATES': {
         'user': '100/hour',
         'ai': '10/minute',
-        'ai_anon': '3/minute',
         'search': '200/minute',
+        'search_ai_fallback': '5/minute',
     }
 }
 
@@ -133,25 +136,33 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-# Redis Cache
+# Redis Cache — derived from REDIS_URL env var
+# REDIS_URL default is redis://localhost:6379/0 (broker); cache uses logical db /1
+_redis_base = REDIS_URL.rsplit('/', 1)[0]  # strip trailing db number
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
+        "LOCATION": f"{_redis_base}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     }
 }
 
-# Celery
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+# Celery — broker and result backend on db0 (from REDIS_URL directly)
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 CELERY_RESULT_EXPIRES = 3600
+
+# Task time limits — prevent stuck AI calls from blocking workers forever.
+# SoftTimeLimitExceeded is raised first (allows graceful cleanup at 25s);
+# the hard limit forcibly kills the process at 30s.
+CELERY_TASK_TIME_LIMIT = 30
+CELERY_TASK_SOFT_TIME_LIMIT = 25
 
 # --- AI Provider Configuration ---
 # Options: 'ollama' (local Llama 3, free) | 'openai' (GPT-4o via GitHub Models)

@@ -35,3 +35,19 @@ SECURE_HSTS_PRELOAD = True
 
 # Site URL (set via env in production)
 SITE_URL = get_env_variable('SITE_URL', default='https://example.com', required=False)
+
+# Static files — collectstatic writes here; Nginx serves from this directory
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# HTTPS enforcement behind reverse proxy (Nginx terminates TLS, forwards X-Forwarded-Proto)
+SECURE_SSL_REDIRECT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# CSRF trusted origins — required for Django admin login over HTTPS
+# Set via env var; falls back to SITE_URL if not explicitly provided
+CSRF_TRUSTED_ORIGINS_STR = get_env_variable('CSRF_TRUSTED_ORIGINS', default='', required=False)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in CSRF_TRUSTED_ORIGINS_STR.split(',') if origin.strip()
+]
+if not CSRF_TRUSTED_ORIGINS and SITE_URL:
+    CSRF_TRUSTED_ORIGINS = [SITE_URL]

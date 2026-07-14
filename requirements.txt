@@ -12,3 +12,10 @@ reportlab==4.4.7
 sqlparse==0.5.5
 openai>=1.30.0
 dj-database-url==3.1.0
+# --- Production dependencies (required for deploy) ---
+psycopg2-binary>=2.9.9
+redis>=5.0.0
+django-redis>=5.4.0
+celery>=5.4.0
+gunicorn>=22.0.0
+ollama>=0.4.0
