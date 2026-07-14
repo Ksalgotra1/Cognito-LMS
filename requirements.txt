@@ -12,6 +12,7 @@ reportlab==4.4.7
 sqlparse==0.5.5
 openai>=1.30.0
 dj-database-url==3.1.0
+requests>=2.31.0
 # --- Production dependencies (required for deploy) ---
 psycopg2-binary>=2.9.9
 redis>=5.0.0
