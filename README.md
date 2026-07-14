@@ -973,11 +973,11 @@ python -m coverage report -m
 The suite covers 10 test classes: DAG cycle detection, Trie search correctness, greedy scheduler output, enrollment flow, quiz validation, certificate generation, and public verification.
 
 ### Coverage Report
-- **Overall Coverage**: 74% (1238 statements)
+- **Overall Coverage**: 61% (1515 statements)
 - **Core Logic & Search (`utils.py`)**: 98%
 - **Models**: 89%
-- **Serializers**: 88%
-- **Views**: 54%
+- **Serializers**: 82%
+- **Views**: 57%
 
 ---
 
