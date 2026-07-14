@@ -6,7 +6,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'role']
+        # 'role' intentionally excluded — any value sent by the client is ignored.
+        # Role is always forced to STUDENT at creation; promotion happens via
+        # a separate admin-only path.
+        fields = ['username', 'email', 'password']
 
     def create(self, validated_data):
         # We use create_user to ensure the password is encrypted
@@ -14,6 +17,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             username=validated_data['username'],
             email=validated_data.get('email'),
             password=validated_data['password'],
-            role=validated_data.get('role', User.Role.STUDENT)
+            role=User.Role.STUDENT  # Always force STUDENT on registration
         )
         return user

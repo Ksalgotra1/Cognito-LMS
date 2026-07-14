@@ -20,7 +20,7 @@ from django.utils.decorators import method_decorator
 from django.core.cache import cache
 
 from rest_framework import generics, permissions, status
-from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -160,6 +160,20 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
                             lesson['video_url'] = None 
 
         return Response(data)
+
+    def perform_update(self, serializer):
+        """Ensure only the course instructor can update the course."""
+        if serializer.instance.instructor != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to edit this course.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        """Ensure only the course instructor can delete the course."""
+        if instance.instructor != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to delete this course.")
+        instance.delete()
 
 class HotCoursesView(APIView):
     """
@@ -495,6 +509,11 @@ class SearchThrottle(UserRateThrottle):
     """Rate limit for search endpoint - 200 requests per minute."""
     scope = 'search'
 
+class SearchAIFallbackThrottle(UserRateThrottle):
+    """Tighter rate limit (5/min) for the expensive LLM search fallback.
+    Applied per-request inline so the cheap Trie path isn't penalized."""
+    scope = 'search_ai_fallback'
+
 class SearchContentView(APIView):
     """
     Unified Hybrid Search with Rate Limiting.
@@ -526,7 +545,12 @@ class SearchContentView(APIView):
             print(f"⚠️ Trie Error: {e}")
 
         # --- LAYER 2: AI FALLBACK (Llama 3) ---
-        # This layer is expensive, so we apply additional rate limiting logic
+        # Apply tighter per-user throttle before hitting the LLM
+        ai_fallback_throttle = SearchAIFallbackThrottle()
+        if not ai_fallback_throttle.allow_request(request, self):
+            from rest_framework.exceptions import Throttled
+            raise Throttled(detail="AI search rate limit exceeded. Try again shortly.")
+
         print(f"⚠️ Trie failed for '{query}'. Engaging Llama 3...")
         keywords = get_search_keywords(query)
         
@@ -575,6 +599,9 @@ class GenerateStudyPlanView(APIView):
     """
     Generates a personalized study schedule using a Backtracking/Greedy algorithm.
     """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AIThrottle]  # 10/min — same as AI tutor; plan gen is compute-heavy
+
     def post(self, request, course_id):
         course = get_object_or_404(Course, id=course_id)
         user = request.user
@@ -618,10 +645,6 @@ class AIThrottle(UserRateThrottle):
     """Custom throttle for expensive AI endpoints."""
     scope = 'ai'
 
-class AIAnonThrottle(AnonRateThrottle):
-    """Custom IP-based throttle for botnet defense before auth checks."""
-    scope = 'ai_anon'
-
 class AskAIView(APIView):
     """
     Async AI Tutor Endpoint.
@@ -630,7 +653,7 @@ class AskAIView(APIView):
     3. Frontend polls for result via get_ai_task_status
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIAnonThrottle, AIThrottle]
+    throttle_classes = [AIThrottle]  # AIAnonThrottle removed — IsAuthenticated rejects anon first
 
     def post(self, request, course_id):
         user_question = request.data.get('question')
@@ -685,6 +708,10 @@ class AskAIView(APIView):
             user_question
         )
 
+        # Security: Store task ownership so get_ai_task_status can scope it
+        from django.core.cache import cache as task_cache
+        task_cache.set(f"task_owner_{task.id}", request.user.id, timeout=3600)
+
         return Response({
             "task_id": task.id,
             "status": "processing",
@@ -699,6 +726,16 @@ def get_ai_task_status(request, task_id):
     Frontend polls this endpoint to check if AI response is ready.
     Returns status: 'processing', 'completed', or 'failed'
     """
+    # Security: Verify the requesting user owns this task.
+    # Prevents one user from reading another's AI result if a task_id leaks.
+    from django.core.cache import cache as task_cache
+    owner_id = task_cache.get(f"task_owner_{task_id}")
+    if owner_id is not None and owner_id != request.user.id:
+        return Response(
+            {"error": "You do not have permission to view this task."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
     from celery.result import AsyncResult
     
     task_result = AsyncResult(task_id)
