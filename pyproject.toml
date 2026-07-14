@@ -1,0 +1,72 @@
+# Ruff configuration for Cognito LMS backend
+# Docs: https://docs.astral.sh/ruff/configuration/
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["backend"]
+
+[tool.ruff.lint]
+# Rules: https://docs.astral.sh/ruff/rules/
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "B",    # flake8-bugbear (common bugs)
+    "S",    # flake8-bandit (security — lightweight overlap with Bandit CI job)
+    "UP",   # pyupgrade (modern Python idioms)
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",    # line too long — handled by formatter
+    "S101",    # assert in tests is fine
+    "S311",    # random in mock.py is fine (demo data, not security)
+    "S105",    # hardcoded password — triggers on test files with test passwords
+    "RUF012",  # mutable class attrs — Django models use this pattern intentionally
+    "B904",    # raise from — too noisy for existing codebase
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use asserts, hardcoded passwords, and test secrets
+"**/tests.py" = ["S101", "S105", "S106"]
+"**/test_*.py" = ["S101", "S105", "S106"]
+# Settings files have wildcard imports (from .base import *) by design
+"**/settings/*.py" = ["F401", "F403", "E402"]
+# Migrations are auto-generated
+"**/migrations/*.py" = ["E501", "RUF012"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["courses", "users", "mysite"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ─── Coverage configuration ─────────────────────────────────────────────────
+
+[tool.coverage.run]
+source = ["courses", "users"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/tests.py",
+    "*/__pycache__/*",
+    "*/management/commands/*",
+    "manage.py",
+]
+
+[tool.coverage.report]
+# Fail CI if coverage drops below this
+fail_under = 70
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ ==",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError",
+]

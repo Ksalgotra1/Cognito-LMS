@@ -1,0 +1,22 @@
+[Unit]
+Description=Cognito LMS Celery Worker
+After=network.target redis-server.service
+
+[Service]
+Type=forking
+User=cognito
+Group=cognito
+WorkingDirectory=/home/cognito/app/backend
+EnvironmentFile=/home/cognito/app/backend/.env
+ExecStart=/home/cognito/app/backend/venv/bin/celery -A mysite worker \
+          --loglevel=info \
+          --concurrency=4 \
+          --logfile=/home/cognito/app/logs/celery.log \
+          --pidfile=/home/cognito/app/celery.pid \
+          --detach
+ExecStop=/home/cognito/app/backend/venv/bin/celery -A mysite control shutdown
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
