@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0003_question_choice'),
+        ("courses", "0003_question_choice"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='userprogress',
-            name='is_quiz_passed',
+            model_name="userprogress",
+            name="is_quiz_passed",
             field=models.BooleanField(default=False),
         ),
     ]

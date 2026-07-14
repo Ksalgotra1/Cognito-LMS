@@ -22,21 +22,21 @@ def _get_provider():
     Factory function — reads settings once at import time and returns
     the appropriate AIProvider instance.
     """
-    provider_name = getattr(settings, 'AI_PROVIDER', 'ollama').lower()
+    provider_name = getattr(settings, "AI_PROVIDER", "ollama").lower()
 
-    if provider_name == 'openai':
+    if provider_name == "openai":
         from .openai_provider import OpenAIProvider
 
         return OpenAIProvider(
-            model=getattr(settings, 'AI_MODEL', 'gpt-4o'),
-            api_key=getattr(settings, 'AI_API_KEY', ''),
+            model=getattr(settings, "AI_MODEL", "gpt-4o"),
+            api_key=getattr(settings, "AI_API_KEY", ""),
         )
     else:
         # Default: Ollama (local, free)
         from .ollama_provider import OllamaProvider
 
         return OllamaProvider(
-            model=getattr(settings, 'AI_MODEL', 'llama3'),
+            model=getattr(settings, "AI_MODEL", "llama3"),
         )
 
 
@@ -55,15 +55,18 @@ def _is_ai_killed() -> bool:
     useful during provider outages or unexpected cost spikes.
     """
     from django.core.cache import cache
-    return bool(cache.get('ai_kill_switch'))
+
+    return bool(cache.get("ai_kill_switch"))
 
 
 # ─── PUBLIC API (matches original ai_client.py signatures) ────────────────────
+
 
 def get_chat_response(system_context: str, user_question: str) -> str:
     """Generate a context-aware AI tutoring response."""
     if _is_ai_killed():
         from .mock import get_mock_chat_response
+
         return get_mock_chat_response()
     return _provider.chat(system_context, user_question)
 
@@ -76,4 +79,4 @@ def get_search_keywords(user_query: str) -> list:
     return _provider.extract_keywords(user_query)
 
 
-__all__ = ['get_chat_response', 'get_search_keywords']
+__all__ = ["get_chat_response", "get_search_keywords"]

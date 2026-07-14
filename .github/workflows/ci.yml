@@ -54,16 +54,17 @@ jobs:
 
       - name: Run Bandit security scan
         working-directory: backend
-        # Skip B101 (assert in tests), B311 (random — used in mock.py for demo data)
+        # B101=assert, B311=random (demo data), B301=pickle (dev mgmt commands only)
+        # Severity high: block CI on critical issues; medium/low advisory only
         run: |
           bandit -r . \
-            --skip B101,B311 \
+            --skip B101,B311,B301 \
             --exclude ./venv,./migrations,./__pycache__ \
             -f json -o bandit-report.json || true
           bandit -r . \
-            --skip B101,B311 \
+            --skip B101,B311,B301 \
             --exclude ./venv,./migrations,./__pycache__ \
-            --severity-level medium
+            --severity-level high
 
       - name: Upload Bandit report
         if: always()

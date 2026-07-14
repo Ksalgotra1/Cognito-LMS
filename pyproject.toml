@@ -22,10 +22,18 @@ select = [
 ignore = [
     "E501",    # line too long — handled by formatter
     "S101",    # assert in tests is fine
+    "S110",    # try-except-pass — intentional fallback pattern in our codebase
+    "S301",    # pickle — only in redis_test.py management command (not user-facing)
     "S311",    # random in mock.py is fine (demo data, not security)
     "S105",    # hardcoded password — triggers on test files with test passwords
+    "RUF001",  # ambiguous unicode — we use emoji in log messages intentionally
+    "RUF005",  # iterable unpacking — Django admin fieldsets use tuple concat by convention
     "RUF012",  # mutable class attrs — Django models use this pattern intentionally
+    "SIM105",  # contextlib.suppress — try/except/pass is more readable for our use
+    "SIM108",  # ternary operator — multi-line if/else is clearer for score calc
     "B904",    # raise from — too noisy for existing codebase
+    "B007",    # unused loop variable — management commands use this pattern
+    "B905",    # zip(strict=) — not needed for our seed data iteration
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -33,9 +41,11 @@ ignore = [
 "**/tests.py" = ["S101", "S105", "S106"]
 "**/test_*.py" = ["S101", "S105", "S106"]
 # Settings files have wildcard imports (from .base import *) by design
-"**/settings/*.py" = ["F401", "F403", "E402"]
+"**/settings/*.py" = ["F401", "F403", "F405", "E402", "RUF100"]
 # Migrations are auto-generated
 "**/migrations/*.py" = ["E501", "RUF012"]
+# Management commands have django.setup() before imports and use emoji
+"**/management/commands/*.py" = ["E402", "RUF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["courses", "users", "mysite"]

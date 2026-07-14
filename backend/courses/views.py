@@ -1,50 +1,48 @@
 # backend/courses/views.py
 
-import io
-import qrcode  # <--- For QR Code generation
-from datetime import date, timedelta
 import datetime
-import time
-import random
-import json
-import requests
+import io
+from datetime import timedelta
 
-from django.conf import settings
-from django.http import FileResponse, JsonResponse
+import qrcode  # <--- For QR Code generation
+import requests
 from django.apps import apps
+from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Count, Q  # <--- Added for Analytics
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
-from django.core.cache import cache
-
-from rest_framework import generics, permissions, status
-from rest_framework.throttling import UserRateThrottle
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.response import Response
-from rest_framework.views import APIView 
+from django.views.decorators.cache import cache_page
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.utils import ImageReader
 
 # --- REPORTLAB IMPORTS (For PDF Generation) ---
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.lib import colors
-from reportlab.lib.utils import ImageReader
+from rest_framework import generics, permissions, status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.views import APIView
+
+from .ai_client import get_search_keywords
 
 # --- APP IMPORTS ---
-from .models import Course, Lesson, UserProgress, Question, Choice, Certificate, Enrollment, StudyPlan, UserProfile
-from .serializers import CourseSerializer, QuestionSerializer, CertificateSerializer, UserProfileSerializer
-from .utils import generate_study_schedule
+from .models import Certificate, Choice, Course, Enrollment, Lesson, StudyPlan, UserProfile, UserProgress
+from .serializers import CertificateSerializer, CourseSerializer, QuestionSerializer, UserProfileSerializer
 
 # --- SERVICE IMPORTS ---
 from .services import get_rag_context
-from .ai_client import get_chat_response, get_search_keywords 
 
 # --- TASK IMPORTS ---
 from .tasks import send_enrollment_email
+from .utils import generate_study_schedule
 
 # --- Course Views ---
+
 
 class CourseListCreateView(generics.ListCreateAPIView):
     """
@@ -52,6 +50,7 @@ class CourseListCreateView(generics.ListCreateAPIView):
     Only authenticated users can create courses (Instructors).
     Caches course list for 5 minutes to reduce DB load.
     """
+
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -65,13 +64,16 @@ class CourseListCreateView(generics.ListCreateAPIView):
         serializer.save(instructor=self.request.user)
         # Invalidate cache on new course creation
         from django.core.cache import cache
+
         cache.clear()  # Clear all cache (simple approach)
+
 
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Handles retrieving, updating, and deleting a specific course.
     🔥 UPDATED: Includes 'Locking' logic AND N+1 Query Optimization.
     """
+
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -83,16 +85,14 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
             get_rag_context(instance.id, request.user)
         except Exception:
             pass
-        
+
         # Prefetch completed lesson IDs
         completed_lesson_ids = set()
         if request.user.is_authenticated:
             completed_lesson_ids = set(
                 UserProgress.objects.filter(
-                    user=request.user,
-                    lesson__module__course=instance,
-                    is_completed=True
-                ).values_list('lesson_id', flat=True)
+                    user=request.user, lesson__module__course=instance, is_completed=True
+                ).values_list("lesson_id", flat=True)
             )
 
         # Prerequisite completion map: 2 aggregate queries, O(1) lookups in serializer
@@ -106,23 +106,20 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
 
             if all_prereq_ids:
                 from django.db.models import Count
+
                 total_map = {
-                    row['module__course_id']: row['total']
-                    for row in Lesson.objects
-                        .filter(module__course_id__in=all_prereq_ids)
-                        .values('module__course_id')
-                        .annotate(total=Count('id'))
+                    row["module__course_id"]: row["total"]
+                    for row in Lesson.objects.filter(module__course_id__in=all_prereq_ids)
+                    .values("module__course_id")
+                    .annotate(total=Count("id"))
                 }
                 done_map = {
-                    row['lesson__module__course_id']: row['done']
-                    for row in UserProgress.objects
-                        .filter(
-                            user=request.user,
-                            lesson__module__course_id__in=all_prereq_ids,
-                            is_completed=True
-                        )
-                        .values('lesson__module__course_id')
-                        .annotate(done=Count('id'))
+                    row["lesson__module__course_id"]: row["done"]
+                    for row in UserProgress.objects.filter(
+                        user=request.user, lesson__module__course_id__in=all_prereq_ids, is_completed=True
+                    )
+                    .values("lesson__module__course_id")
+                    .annotate(done=Count("id"))
                 }
                 for cid in all_prereq_ids:
                     total = total_map.get(cid, 0)
@@ -130,8 +127,8 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
                     prereq_completion_map[cid] = total > 0 and done >= total
 
         context = self.get_serializer_context()
-        context['completed_lesson_ids'] = completed_lesson_ids
-        context['prereq_completion_map'] = prereq_completion_map
+        context["completed_lesson_ids"] = completed_lesson_ids
+        context["prereq_completion_map"] = prereq_completion_map
 
         serializer = self.get_serializer(instance, context=context)
         data = serializer.data
@@ -142,22 +139,22 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
         if user.is_authenticated:
             is_enrolled = Enrollment.objects.filter(student=user, course=instance).exists()
 
-        data['is_enrolled'] = is_enrolled
+        data["is_enrolled"] = is_enrolled
 
         # Iterate through modules/lessons to lock content if not enrolled
-        if 'modules' in data:
-            for module in data['modules']:
-                if 'lessons' in module:
-                    for lesson in module['lessons']:
+        if "modules" in data:
+            for module in data["modules"]:
+                if "lessons" in module:
+                    for lesson in module["lessons"]:
                         if is_enrolled:
                             # User is enrolled: Show everything
-                            lesson['is_locked'] = False
+                            lesson["is_locked"] = False
                         else:
                             # User NOT enrolled: Lock it 🔒
-                            lesson['content'] = "🔒 Locked. Enroll to view content."
-                            lesson['is_locked'] = True
+                            lesson["content"] = "🔒 Locked. Enroll to view content."
+                            lesson["is_locked"] = True
                             # Hide sensitive data
-                            lesson['video_url'] = None 
+                            lesson["video_url"] = None
 
         return Response(data)
 
@@ -165,6 +162,7 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
         """Ensure only the course instructor can update the course."""
         if serializer.instance.instructor != self.request.user:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("You do not have permission to edit this course.")
         serializer.save()
 
@@ -172,54 +170,61 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
         """Ensure only the course instructor can delete the course."""
         if instance.instructor != self.request.user:
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied("You do not have permission to delete this course.")
         instance.delete()
+
 
 class HotCoursesView(APIView):
     """
     Returns the top courses based on new enrollments in the last 24 hours.
     Result is cached for 10 minutes.
     """
+
     permission_classes = [AllowAny]  # Publicly accessible for the marketplace
 
     def get(self, request):
-        cache_key = 'hot_courses_24h'
+        cache_key = "hot_courses_24h"
         cached_data = cache.get(cache_key)
-        
+
         if cached_data is not None:
             return Response(cached_data)
-            
+
         last_24h = timezone.now() - timedelta(hours=24)
-        
+
         # Get course IDs with the most enrollments in the last 24h
         # We limit to 5 hot courses
-        hot_course_ids = Enrollment.objects.filter(enrolled_at__gte=last_24h)\
-            .values('course_id')\
-            .annotate(enrollment_count=Count('id'))\
-            .order_by('-enrollment_count')[:5]
-            
+        hot_course_ids = (
+            Enrollment.objects.filter(enrolled_at__gte=last_24h)
+            .values("course_id")
+            .annotate(enrollment_count=Count("id"))
+            .order_by("-enrollment_count")[:5]
+        )
+
         if not hot_course_ids:
             return Response([])
-            
-        course_ids = [item['course_id'] for item in hot_course_ids]
-        
+
+        course_ids = [item["course_id"] for item in hot_course_ids]
+
         # Fetch the actual course objects, preserving the order of hotness
         # Since course_ids is small (max 5), we can do this simply:
         courses = Course.objects.filter(id__in=course_ids)
         course_dict = {course.id: course for course in courses}
         sorted_courses = [course_dict[cid] for cid in course_ids if cid in course_dict]
-        
-        serializer = CourseSerializer(sorted_courses, many=True, context={'request': request})
+
+        serializer = CourseSerializer(sorted_courses, many=True, context={"request": request})
         data = serializer.data
-        
+
         # Cache for 10 minutes
         cache.set(cache_key, data, timeout=60 * 10)
-        
+
         return Response(data)
+
 
 # --- STUDENT ANALYTICS DASHBOARD ---
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def student_dashboard_stats(request):
     """
@@ -229,100 +234,96 @@ def student_dashboard_stats(request):
     - Total stats (completed lessons, enrolled count)
     """
     user = request.user
-    
+
     # 1. Get courses via the Enrollment model to ensure we only show valid enrollments
-    enrollments = Enrollment.objects.filter(student=user).select_related('course')
-    
+    enrollments = Enrollment.objects.filter(student=user).select_related("course")
+
     course_cards = []
-    
+
     for enrollment in enrollments:
         course = enrollment.course
-        
+
         # A. Calculate Progress %
         total_lessons = Lesson.objects.filter(module__course=course).count()
         completed_lessons = UserProgress.objects.filter(
-            user=user, 
-            lesson__module__course=course, 
-            is_completed=True
+            user=user, lesson__module__course=course, is_completed=True
         ).count()
-        
+
         progress_percent = 0
         if total_lessons > 0:
             progress_percent = int((completed_lessons / total_lessons) * 100)
-            
+
         # B. Find the "Up Next" Lesson (First incomplete lesson)
-        all_lesson_ids = Lesson.objects.filter(module__course=course)\
-            .order_by('module__order', 'order')\
-            .values_list('id', flat=True)
-        
+        all_lesson_ids = (
+            Lesson.objects.filter(module__course=course).order_by("module__order", "order").values_list("id", flat=True)
+        )
+
         completed_lesson_ids = UserProgress.objects.filter(
-            user=user, 
-            lesson__module__course=course, 
-            is_completed=True
-        ).values_list('lesson_id', flat=True)
-        
+            user=user, lesson__module__course=course, is_completed=True
+        ).values_list("lesson_id", flat=True)
+
         next_lesson_id = next((lid for lid in all_lesson_ids if lid not in completed_lesson_ids), None)
-        
+
         next_lesson_title = "Course Completed!"
         next_lesson_url = None
-        
+
         if next_lesson_id:
             next_lesson_obj = Lesson.objects.get(id=next_lesson_id)
             next_lesson_title = next_lesson_obj.title
             next_lesson_url = f"/courses/{course.id}"
 
         # C. Most recent progress activity
-        last_progress = UserProgress.objects.filter(
-            user=user, lesson__module__course=course
-        ).order_by('-updated_at').first()
+        last_progress = (
+            UserProgress.objects.filter(user=user, lesson__module__course=course).order_by("-updated_at").first()
+        )
         last_activity = last_progress.updated_at.isoformat() if last_progress else None
 
-        course_cards.append({
-            "id": course.id,
-            "title": course.title,
-            "thumbnail": course.thumbnail_url, 
-            "progress": progress_percent,
-            "completed_lessons": completed_lessons,
-            "total_lessons": total_lessons,
-            "next_lesson_title": next_lesson_title,
-            "next_lesson_url": next_lesson_url,
-            "last_activity": last_activity
-        })
+        course_cards.append(
+            {
+                "id": course.id,
+                "title": course.title,
+                "thumbnail": course.thumbnail_url,
+                "progress": progress_percent,
+                "completed_lessons": completed_lessons,
+                "total_lessons": total_lessons,
+                "next_lesson_title": next_lesson_title,
+                "next_lesson_url": next_lesson_url,
+                "last_activity": last_activity,
+            }
+        )
 
-    return Response({
-        "enrolled_courses": course_cards,
-        "stats": {
-            "total_enrolled": enrollments.count(),
-            "total_completed_lessons": UserProgress.objects.filter(user=user, is_completed=True).count()
+    return Response(
+        {
+            "enrolled_courses": course_cards,
+            "stats": {
+                "total_enrolled": enrollments.count(),
+                "total_completed_lessons": UserProgress.objects.filter(user=user, is_completed=True).count(),
+            },
         }
-    })
+    )
 
 
 # --- Lesson Completion Logic ---
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def toggle_lesson_completion(request, lesson_id):
     """
     Toggles the 'is_completed' status of a lesson for the user.
     """
     lesson = get_object_or_404(Lesson, id=lesson_id)
-    progress, created = UserProgress.objects.get_or_create(
-        user=request.user,
-        lesson=lesson
-    )
+    progress, _created = UserProgress.objects.get_or_create(user=request.user, lesson=lesson)
     progress.is_completed = not progress.is_completed
     progress.save()
-    
-    return Response({
-        "lesson_id": lesson.id,
-        "is_completed": progress.is_completed
-    })
+
+    return Response({"lesson_id": lesson.id, "is_completed": progress.is_completed})
 
 
 # --- Quiz Engine Logic ---
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_quiz(request, lesson_id):
     """
@@ -333,7 +334,8 @@ def get_quiz(request, lesson_id):
     serializer = QuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def submit_quiz(request, lesson_id):
     """
@@ -341,20 +343,16 @@ def submit_quiz(request, lesson_id):
     """
     lesson = get_object_or_404(Lesson, id=lesson_id)
     questions = lesson.questions.all()
-    
+
     total_questions = questions.count()
     correct_count = 0
-    user_answers = request.data 
-    
+    user_answers = request.data
+
     for question in questions:
         question_id_str = str(question.id)
         if question_id_str in user_answers:
             selected_choice_id = user_answers[question_id_str]
-            is_correct = Choice.objects.filter(
-                id=selected_choice_id, 
-                question=question, 
-                is_correct=True
-            ).exists()
+            is_correct = Choice.objects.filter(id=selected_choice_id, question=question, is_correct=True).exists()
             if is_correct:
                 correct_count += 1
 
@@ -362,28 +360,21 @@ def submit_quiz(request, lesson_id):
         score = (correct_count / total_questions) * 100
     else:
         score = 0
-    
+
     passed = score >= 70
 
     if passed:
-        progress, created = UserProgress.objects.get_or_create(
-            user=request.user,
-            lesson=lesson
-        )
+        progress, _created = UserProgress.objects.get_or_create(user=request.user, lesson=lesson)
         progress.is_quiz_passed = True
         progress.save()
-    
-    return Response({
-        "total": total_questions,
-        "correct": correct_count,
-        "score": round(score, 2),
-        "passed": passed 
-    })
+
+    return Response({"total": total_questions, "correct": correct_count, "score": round(score, 2), "passed": passed})
 
 
 # ---  Certificate Generator ---
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def generate_certificate(request, course_id):
     """
@@ -391,30 +382,23 @@ def generate_certificate(request, course_id):
     """
     course = get_object_or_404(Course, id=course_id)
     user = request.user
-    
+
     # 1. Video Completion Check
     total_lessons = Lesson.objects.filter(module__course=course).count()
-    completed_lessons = UserProgress.objects.filter(
-        user=user, lesson__module__course=course, is_completed=True
-    ).count()
+    completed_lessons = UserProgress.objects.filter(user=user, lesson__module__course=course, is_completed=True).count()
 
     if completed_lessons < total_lessons:
         return Response({"detail": f"Incomplete videos. ({completed_lessons}/{total_lessons})"}, status=403)
 
     # 2. Quiz Completion Check
     lessons_with_quizzes = Lesson.objects.filter(module__course=course, questions__isnull=False).distinct().count()
-    passed_quizzes = UserProgress.objects.filter(
-        user=user, lesson__module__course=course, is_quiz_passed=True
-    ).count()
+    passed_quizzes = UserProgress.objects.filter(user=user, lesson__module__course=course, is_quiz_passed=True).count()
 
     if passed_quizzes < lessons_with_quizzes:
-         return Response({"detail": f"Incomplete quizzes. ({passed_quizzes}/{lessons_with_quizzes})"}, status=403)
-        
+        return Response({"detail": f"Incomplete quizzes. ({passed_quizzes}/{lessons_with_quizzes})"}, status=403)
+
     # Mint Certificate
-    cert_obj, created = Certificate.objects.get_or_create(
-        user=user,
-        course=course
-    )
+    cert_obj, _created = Certificate.objects.get_or_create(user=user, course=course)
 
     # QR Code Generation
     verify_url = f"{settings.FRONTEND_URL}/verify/{cert_obj.certificate_id}"
@@ -435,11 +419,11 @@ def generate_certificate(request, course_id):
     # Borders
     p.setStrokeColorRGB(0.1, 0.2, 0.5)
     p.setLineWidth(12)
-    p.rect(30, 30, width-60, height-60)
+    p.rect(30, 30, width - 60, height - 60)
 
     p.setStrokeColorRGB(0.8, 0.7, 0.2)
     p.setLineWidth(3)
-    p.rect(45, 45, width-90, height-90)
+    p.rect(45, 45, width - 90, height - 90)
 
     # Content
     center_x = width / 2.0
@@ -465,7 +449,7 @@ def generate_certificate(request, course_id):
     # Footer
     footer_y = 160
     p.setFont("Helvetica", 14)
-    date_str = cert_obj.issued_at.strftime("%B %d, %Y") 
+    date_str = cert_obj.issued_at.strftime("%B %d, %Y")
     p.drawString(100, footer_y, f"Issued: {date_str}")
 
     p.setLineWidth(2)
@@ -479,7 +463,7 @@ def generate_certificate(request, course_id):
     qr_size = 80
     p.drawImage(qr_code_image, qr_x, qr_y, width=qr_size, height=qr_size)
     p.linkURL(verify_url, (qr_x, qr_y, qr_x + qr_size, qr_y + qr_size), relative=1)
-    
+
     p.setFont("Helvetica", 6)
     p.setFillColor(colors.black)
     uuid_str = str(cert_obj.certificate_id)
@@ -497,22 +481,28 @@ class CertificateVerifyView(generics.RetrieveAPIView):
     """
     Public Endpoint: Allows anyone with the UUID to verify a certificate.
     """
+
     queryset = Certificate.objects.all()
     serializer_class = CertificateSerializer
-    permission_classes = [permissions.AllowAny] 
-    lookup_field = 'certificate_id' 
+    permission_classes = [permissions.AllowAny]
+    lookup_field = "certificate_id"
 
 
 # --- HYBRID SEARCH ---
 
+
 class SearchThrottle(UserRateThrottle):
     """Rate limit for search endpoint - 200 requests per minute."""
-    scope = 'search'
+
+    scope = "search"
+
 
 class SearchAIFallbackThrottle(UserRateThrottle):
     """Tighter rate limit (5/min) for the expensive LLM search fallback.
     Applied per-request inline so the cheap Trie path isn't penalized."""
-    scope = 'search_ai_fallback'
+
+    scope = "search_ai_fallback"
+
 
 class SearchContentView(APIView):
     """
@@ -520,25 +510,26 @@ class SearchContentView(APIView):
     Layer 1 (RAM): Queries Trie for Courses + Lessons instantly.
     Layer 2 (AI): Fallback to Llama 3 -> Queries DB for Courses + Lessons.
     """
+
     permission_classes = [AllowAny]  # Search is public
     throttle_classes = [SearchThrottle]
 
     def get(self, request):
-        query = request.GET.get('q', '').strip()
-        if not query: 
+        query = request.GET.get("q", "").strip()
+        if not query:
             return Response([], status=200)
 
         results = []
-        
+
         # --- LAYER 1: TRIE (Fast RAM Search) ---
         try:
-            trie = apps.get_app_config('courses').trie
+            trie = apps.get_app_config("courses").trie
             if trie:
                 trie_results = trie.search(query)
                 if trie_results:
                     for r in trie_results:
-                        r_copy = r.copy() 
-                        r_copy['source'] = 'trie_fast' 
+                        r_copy = r.copy()
+                        r_copy["source"] = "trie_fast"
                         results.append(r_copy)
                     return Response(results[:10], status=200)
         except Exception as e:
@@ -549,11 +540,12 @@ class SearchContentView(APIView):
         ai_fallback_throttle = SearchAIFallbackThrottle()
         if not ai_fallback_throttle.allow_request(request, self):
             from rest_framework.exceptions import Throttled
+
             raise Throttled(detail="AI search rate limit exceeded. Try again shortly.")
 
         print(f"⚠️ Trie failed for '{query}'. Engaging Llama 3...")
         keywords = get_search_keywords(query)
-        
+
         if not keywords:
             return Response([], status=200)
 
@@ -563,87 +555,93 @@ class SearchContentView(APIView):
 
         ai_courses = Course.objects.filter(q_lookup).distinct()[:3]
         for c in ai_courses:
-            results.append({
-                "id": c.id,
-                "title": c.title,
-                "type": "course",
-                "course_title": None,
-                "url": f"/courses/{c.id}",
-                "source": "ai_semantic",
-                "description": c.description
-            })
+            results.append(
+                {
+                    "id": c.id,
+                    "title": c.title,
+                    "type": "course",
+                    "course_title": None,
+                    "url": f"/courses/{c.id}",
+                    "source": "ai_semantic",
+                    "description": c.description,
+                }
+            )
 
         if len(results) < 5:
             q_lesson = Q()
             for k in keywords:
                 q_lesson |= Q(title__icontains=k)
-                
-            ai_lessons = Lesson.objects.filter(q_lesson).select_related('module__course')[:5]
-            for l in ai_lessons:
-                results.append({
-                    "id": l.id,
-                    "title": l.title,
-                    "type": "lesson",
-                    "course_title": f"AI Match in {l.module.course.title}",
-                    "url": f"/courses/{l.module.course.id}",
-                    "source": "ai_semantic",
-                    "description": None
-                })
+
+            ai_lessons = Lesson.objects.filter(q_lesson).select_related("module__course")[:5]
+            for lesson in ai_lessons:
+                results.append(
+                    {
+                        "id": lesson.id,
+                        "title": lesson.title,
+                        "type": "lesson",
+                        "course_title": f"AI Match in {lesson.module.course.title}",
+                        "url": f"/courses/{lesson.module.course.id}",
+                        "source": "ai_semantic",
+                        "description": None,
+                    }
+                )
 
         return Response(results[:10], status=200)
 
 
 # --- Study Plan Scheduler (Algorithmic) ---
 
+
+class AIThrottle(UserRateThrottle):
+    """Custom throttle for expensive AI endpoints."""
+
+    scope = "ai"
+
+
 class GenerateStudyPlanView(APIView):
     """
     Generates a personalized study schedule using a Backtracking/Greedy algorithm.
     """
+
     permission_classes = [IsAuthenticated]
     throttle_classes = [AIThrottle]  # 10/min — same as AI tutor; plan gen is compute-heavy
 
     def post(self, request, course_id):
         course = get_object_or_404(Course, id=course_id)
         user = request.user
-        
-        target_date_str = request.data.get('target_date')
-        availability = request.data.get('availability') 
-        
+
+        target_date_str = request.data.get("target_date")
+        availability = request.data.get("availability")
+
         if not target_date_str or not availability:
             return Response({"error": "Missing target_date or availability"}, status=400)
 
         lessons = []
         for module in course.modules.all():
             lessons.extend(module.lessons.all())
-            
+
         if not lessons:
-             return Response({"error": "Course has no lessons to schedule."}, status=400)
+            return Response({"error": "Course has no lessons to schedule."}, status=400)
 
         start_date = timezone.now().date()
         target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
-        
+
         try:
             schedule = generate_study_schedule(start_date, target_date, availability, lessons)
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
-        
-        plan, created = StudyPlan.objects.update_or_create(
+
+        plan, _created = StudyPlan.objects.update_or_create(
             user=user,
             course=course,
-            defaults={
-                'target_date': target_date,
-                'weekly_availability': availability,
-                'generated_schedule': schedule
-            }
+            defaults={"target_date": target_date, "weekly_availability": availability, "generated_schedule": schedule},
         )
-        
+
         return Response(plan.generated_schedule, status=status.HTTP_200_OK)
-    
+
+
 # --- Ask AI (Async via Celery) ---
 
-class AIThrottle(UserRateThrottle):
-    """Custom throttle for expensive AI endpoints."""
-    scope = 'ai'
 
 class AskAIView(APIView):
     """
@@ -652,11 +650,12 @@ class AskAIView(APIView):
     2. Returns task_id immediately (non-blocking)
     3. Frontend polls for result via get_ai_task_status
     """
+
     permission_classes = [IsAuthenticated]
     throttle_classes = [AIThrottle]  # AIAnonThrottle removed — IsAuthenticated rejects anon first
 
     def post(self, request, course_id):
-        user_question = request.data.get('question')
+        user_question = request.data.get("question")
         if not user_question:
             return Response({"error": "Question is required"}, status=400)
 
@@ -664,7 +663,7 @@ class AskAIView(APIView):
         user_question = str(user_question).strip()
         if len(user_question) > 1000:
             return Response({"error": "Question exceeds maximum length of 1000 characters"}, status=400)
-            
+
         # Security: Enforce strictly English text (ASCII only) to prevent obfuscation
         if not user_question.isascii():
             return Response({"error": "Only English characters are allowed in the prompt"}, status=400)
@@ -683,7 +682,6 @@ class AskAIView(APIView):
             "override",
             "act as a",
             "do anything now",
-            
             # Network / XSS / Injection Defense
             "<script",
             "javascript:",
@@ -693,7 +691,7 @@ class AskAIView(APIView):
             "import sys",
             "__subclasses__",
             "http://",
-            "https://"
+            "https://",
         ]
         question_lower = user_question.lower()
         if any(pattern in question_lower for pattern in suspicious_patterns):
@@ -702,24 +700,20 @@ class AskAIView(APIView):
         # FIRE AND (almost) FORGET
         # Start the Celery task and return immediately
         from .tasks import generate_ai_response_task
-        task = generate_ai_response_task.delay(
-            course_id, 
-            request.user.id, 
-            user_question
-        )
+
+        task = generate_ai_response_task.delay(course_id, request.user.id, user_question)
 
         # Security: Store task ownership so get_ai_task_status can scope it
         from django.core.cache import cache as task_cache
+
         task_cache.set(f"task_owner_{task.id}", request.user.id, timeout=3600)
 
-        return Response({
-            "task_id": task.id,
-            "status": "processing",
-            "message": "AI is thinking..."
-        }, status=202)  # 202 Accepted
+        return Response(
+            {"task_id": task.id, "status": "processing", "message": "AI is thinking..."}, status=202
+        )  # 202 Accepted
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_ai_task_status(request, task_id):
     """
@@ -729,58 +723,41 @@ def get_ai_task_status(request, task_id):
     # Security: Verify the requesting user owns this task.
     # Prevents one user from reading another's AI result if a task_id leaks.
     from django.core.cache import cache as task_cache
+
     owner_id = task_cache.get(f"task_owner_{task_id}")
     if owner_id is not None and owner_id != request.user.id:
-        return Response(
-            {"error": "You do not have permission to view this task."},
-            status=status.HTTP_403_FORBIDDEN
-        )
+        return Response({"error": "You do not have permission to view this task."}, status=status.HTTP_403_FORBIDDEN)
 
     from celery.result import AsyncResult
-    
+
     task_result = AsyncResult(task_id)
-    
-    if task_result.state == 'PENDING':
-        return Response({
-            "status": "processing",
-            "message": "AI is still thinking..."
-        })
-    elif task_result.state == 'SUCCESS':
+
+    if task_result.state == "PENDING":
+        return Response({"status": "processing", "message": "AI is still thinking..."})
+    elif task_result.state == "SUCCESS":
         result = task_result.result
         if isinstance(result, dict):
             if result.get("status") == "error":
-                return Response({
-                    "status": "failed",
-                    "error": result.get("answer", "Unknown error")
-                }, status=500)
-            return Response({
-                "status": "completed",
-                "answer": result.get("answer", "")
-            })
+                return Response({"status": "failed", "error": result.get("answer", "Unknown error")}, status=500)
+            return Response({"status": "completed", "answer": result.get("answer", "")})
         # Fallback for non-dict results
-        return Response({
-            "status": "completed",
-            "answer": str(result)
-        })
-    elif task_result.state == 'FAILURE':
-        return Response({
-            "status": "failed",
-            "error": str(task_result.result)
-        }, status=500)
+        return Response({"status": "completed", "answer": str(result)})
+    elif task_result.state == "FAILURE":
+        return Response({"status": "failed", "error": str(task_result.result)}, status=500)
     else:
         # STARTED, RETRY, etc.
-        return Response({
-            "status": "processing",
-            "message": f"Task state: {task_result.state}"
-        })
-    
+        return Response({"status": "processing", "message": f"Task state: {task_result.state}"})
+
+
 # --- User Profile Settings ---
+
 
 class UserProfileView(APIView):
     """
     Handles fetching and updating user profile settings.
     Includes rate-limiting for name changes (Security).
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -794,47 +771,49 @@ class UserProfileView(APIView):
         data = request.data
 
         # --- NAME CHANGE LIMIT LOGIC ---
-        new_first = data.get('first_name')
-        new_last = data.get('last_name')
+        new_first = data.get("first_name")
+        new_last = data.get("last_name")
 
         if new_first or new_last:
             # 1. Check if name is actually different
             if new_first == user.first_name and new_last == user.last_name:
-                pass # No change, skip logic
+                pass  # No change, skip logic
             else:
                 # 2. Filter history for the last 365 days
                 one_year_ago = timezone.now() - timedelta(days=365)
                 recent_changes = [
-                    ts for ts in profile.name_change_history 
-                    if datetime.datetime.fromisoformat(ts) > one_year_ago
+                    ts for ts in profile.name_change_history if datetime.datetime.fromisoformat(ts) > one_year_ago
                 ]
-                
+
                 # 3. Check Limit (Max 2 per year)
                 if len(recent_changes) >= 2:
                     return Response(
-                        {"error": "Limit reached: You can only change your name 2 times per year."}, 
-                        status=status.HTTP_403_FORBIDDEN
+                        {"error": "Limit reached: You can only change your name 2 times per year."},
+                        status=status.HTTP_403_FORBIDDEN,
                     )
 
                 # 4. Apply Changes
-                if new_first: user.first_name = new_first
-                if new_last: user.last_name = new_last
+                if new_first:
+                    user.first_name = new_first
+                if new_last:
+                    user.last_name = new_last
                 user.save()
 
                 # 5. Log the change
                 profile.name_change_history.append(timezone.now().isoformat())
 
         # Update Bio
-        if 'bio' in data:
-            profile.bio = data['bio']
-        
+        if "bio" in data:
+            profile.bio = data["bio"]
+
         profile.save()
         return Response({"message": "Profile updated successfully!"})
-    
+
 
 # --- ENROLLMENT LOGIC (With Async Email) ---
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def enroll_course(request, course_id):
     """
@@ -854,46 +833,40 @@ def enroll_course(request, course_id):
     # .delay() sends it to Redis. The server returns immediately (Fast UI).
     send_enrollment_email.delay(user.email, course.title)
 
-    return Response({
-        "message": f"Successfully enrolled in {course.title}",
-        "enrolled": True
-    }, status=201)
+    return Response({"message": f"Successfully enrolled in {course.title}", "enrolled": True}, status=201)
 
 
 # --- Code Execution Proxy ---
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def execute_code(request):
     """
     Proxy code execution through backend for logging/security.
     Prevents direct frontend calls to Piston, enabling rate limiting and abuse protection.
     """
-    code = request.data.get('code', '')
-    language = request.data.get('language', 'python')
-    
+    code = request.data.get("code", "")
+    language = request.data.get("language", "python")
+
     # Map language to appropriate file extension
     file_extensions = {
-        'python': 'main.py',
-        'javascript': 'main.js',
-        'java': 'Main.java',
-        'c': 'main.c',
-        'cpp': 'main.cpp',
+        "python": "main.py",
+        "javascript": "main.js",
+        "java": "Main.java",
+        "c": "main.c",
+        "cpp": "main.cpp",
     }
-    filename = file_extensions.get(language, 'main.py')
-    
+    filename = file_extensions.get(language, "main.py")
+
     try:
         response = requests.post(
-            'https://emkc.org/api/v2/piston/execute',
-            json={
-                'language': language,
-                'version': '3.10.0',
-                'files': [{'name': filename, 'content': code}]
-            },
-            timeout=30
+            "https://emkc.org/api/v2/piston/execute",
+            json={"language": language, "version": "3.10.0", "files": [{"name": filename, "content": code}]},
+            timeout=30,
         )
         return Response(response.json())
     except requests.Timeout:
-        return Response({'error': 'Execution timed out'}, status=408)
+        return Response({"error": "Execution timed out"}, status=408)
     except requests.RequestException as e:
-        return Response({'error': f'Execution failed: {str(e)}'}, status=500)
+        return Response({"error": f"Execution failed: {e!s}"}, status=500)

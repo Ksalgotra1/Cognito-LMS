@@ -6,21 +6,25 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0008_lesson_duration_minutes_studyplan'),
+        ("courses", "0008_lesson_duration_minutes_studyplan"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='UserProfile',
+            name="UserProfile",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('bio', models.TextField(blank=True, max_length=500)),
-                ('avatar_url', models.URLField(blank=True, null=True)),
-                ('name_change_history', models.JSONField(blank=True, default=list)),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='profile', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("bio", models.TextField(blank=True, max_length=500)),
+                ("avatar_url", models.URLField(blank=True, null=True)),
+                ("name_change_history", models.JSONField(blank=True, default=list)),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE, related_name="profile", to=settings.AUTH_USER_MODEL
+                    ),
+                ),
             ],
         ),
     ]

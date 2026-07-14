@@ -81,8 +81,8 @@ const CourseDetail = () => {
       // 🔥 Trigger fetch with 'true' to update activeLesson content without full page reload
       await fetchCourseData(true); 
       addToast('Enrollment Successful! The course is now unlocked.', 'success');
-    } catch (error) {
-      // Error toast handled by axios interceptor
+    } catch (_error) {
+      // Error toast is handled by the global axios interceptor
     } finally {
       setEnrolling(false);
     }
@@ -116,7 +116,7 @@ const CourseDetail = () => {
 
     try {
         await dispatch(toggleLessonCompletion(activeLesson.id)).unwrap();
-    } catch (error) {
+    } catch (_error) {
         console.error("Sync failed, rolling back UI");
         // Rollback on error
         setActiveLesson(prev => ({ ...prev, is_completed: previousStatus }));
@@ -273,7 +273,7 @@ const CourseDetail = () => {
                     <div className="prose prose-slate max-w-none text-[15px] leading-relaxed w-full text-gray-800 mb-8">
                         <ReactMarkdown 
                             components={{
-                                a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium" />
+                                a: ({node: _node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium" />
                             }}
                         >
                             {activeLesson.content}
@@ -311,7 +311,7 @@ const CourseDetail = () => {
                          <div className="prose prose-slate max-w-none text-[14px] leading-relaxed w-full">
                              <ReactMarkdown 
                                  components={{
-                                     a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium" />
+                                     a: ({node: _node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium" />
                                  }}
                              >
                                  {/* Auto-linkify raw youtube URLs if they aren't already markdown links */}

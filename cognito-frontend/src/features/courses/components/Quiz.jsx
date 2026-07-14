@@ -24,7 +24,7 @@ const Quiz = () => {
         const response = await client.get(`api/courses/lessons/${lessonId}/quiz/`, config);
         setQuestions(response.data);
         setLoading(false);
-      } catch (err) {
+      } catch (_err) {
         setError("Failed to load quiz. Please try again.");
         setLoading(false);
       }
@@ -50,7 +50,7 @@ const Quiz = () => {
       );
       setResult(response.data);
       addToast(response.data.passed ? 'Quiz passed!' : 'Quiz submitted', response.data.passed ? 'success' : 'error');
-    } catch (err) {
+    } catch (_err) {
       // Error toast handled by axios interceptor
     }
   };

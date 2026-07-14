@@ -9,6 +9,7 @@ Generate one at https://github.com/settings/tokens with `models:read` scope.
 """
 
 import json
+
 from openai import OpenAI
 
 from .base import AIProvider
@@ -84,8 +85,8 @@ class OpenAIProvider(AIProvider):
             # --- ROBUST PARSING STRATEGY ---
             # GPT-4o is much better at following format instructions,
             # but we still apply surgical JSON extraction as a safety net.
-            start_idx = content.find('[')
-            end_idx = content.rfind(']') + 1
+            start_idx = content.find("[")
+            end_idx = content.rfind("]") + 1
 
             if start_idx != -1 and end_idx != -1:
                 clean_json = content[start_idx:end_idx]

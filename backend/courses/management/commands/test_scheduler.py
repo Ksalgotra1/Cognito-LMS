@@ -1,8 +1,11 @@
+import json
+from datetime import date, timedelta
+
 from django.core.management.base import BaseCommand
+
 from courses.models import Course, Lesson
 from courses.utils import generate_study_schedule
-from datetime import date, timedelta
-import json
+
 
 class Command(BaseCommand):
     help = "Tests the Study Scheduler Algorithm with mock data."
@@ -25,20 +28,20 @@ class Command(BaseCommand):
         self.stdout.write(f"✅ Found Course: {course.title} ({lessons.count()} lessons)")
 
         # 2. Define Constraints (The "Student's" Request)
-        # Scenario: Student works full time. 
-        # Can only study: 
+        # Scenario: Student works full time.
+        # Can only study:
         # - Mondays: 1 Hour (60 mins)
         # - Wednesdays: 2 Hours (120 mins)
         # - Weekends: 0 mins (Busy)
         start_date = date.today()
-        target_date = start_date + timedelta(days=365) # Give them a year
-        
+        target_date = start_date + timedelta(days=365)  # Give them a year
+
         availability = {
-            "Mon": 60,  
-            "Wed": 120, 
+            "Mon": 60,
+            "Wed": 120,
             # Other days are implicitly 0
         }
-        
+
         self.stdout.write(self.style.SUCCESS(f"ℹ️  Constraint: Mon (60m), Wed (120m) | Start: {start_date}"))
 
         # 3. RUN THE ALGORITHM
@@ -50,19 +53,21 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("❌ Result: Empty Schedule! (Check logic or constraints)"))
         else:
             self.stdout.write(self.style.SUCCESS("✅ Result: Schedule Generated Successfully!"))
-            
+
             # Print the first 3 scheduled days to verify logic
             self.stdout.write("\n--- PREVIEW (First 3 Active Days) ---")
             print(json.dumps(schedule[:3], indent=2))
-            
+
             # Calculate stats
             total_days_scheduled = len(schedule)
-            total_lessons_scheduled = sum(len(day['lessons']) for day in schedule)
-            
-            self.stdout.write(f"\n📊 Stats: Scheduled {total_lessons_scheduled}/{lessons.count()} lessons over {total_days_scheduled} active study days.")
-            
+            total_lessons_scheduled = sum(len(day["lessons"]) for day in schedule)
+
+            self.stdout.write(
+                f"\n📊 Stats: Scheduled {total_lessons_scheduled}/{lessons.count()} lessons over {total_days_scheduled} active study days."
+            )
+
             # Check if logic holds (Are there any Tuesdays?)
-            days_used = [day['day'] for day in schedule]
+            days_used = [day["day"] for day in schedule]
             if "Tue" in days_used or "Fri" in days_used:
                 self.stdout.write(self.style.ERROR("❌ FAILED: Algorithm scheduled lessons on a busy day!"))
             else:

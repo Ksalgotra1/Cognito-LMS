@@ -15,7 +15,7 @@ const CertificateVerify = () => {
         // Call the EXISTING Backend API to validate
         const response = await client.get(`/api/courses/certificate/verify/${id}/`);
         setData(response.data);
-      } catch (err) {
+      } catch (_err) {
         setError(true);
       } finally {
         setLoading(false);

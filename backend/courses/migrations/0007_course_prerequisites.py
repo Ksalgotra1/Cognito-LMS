@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0006_enrollment'),
+        ("courses", "0006_enrollment"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='course',
-            name='prerequisites',
-            field=models.ManyToManyField(blank=True, related_name='required_for', to='courses.course'),
+            model_name="course",
+            name="prerequisites",
+            field=models.ManyToManyField(blank=True, related_name="required_for", to="courses.course"),
         ),
     ]

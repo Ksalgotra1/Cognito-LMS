@@ -7,6 +7,7 @@ Ollama instance.
 """
 
 import json
+
 import ollama
 
 from .base import AIProvider
@@ -41,12 +42,12 @@ class OllamaProvider(AIProvider):
             response = ollama.chat(
                 model=self.model,
                 messages=[
-                    {'role': 'system', 'content': system_context},
-                    {'role': 'user', 'content': user_question},
+                    {"role": "system", "content": system_context},
+                    {"role": "user", "content": user_question},
                 ],
-                options={'timeout': 20},  # Hard cap: 20s network wait
+                options={"timeout": 20},  # Hard cap: 20s network wait
             )
-            return response['message']['content']
+            return response["message"]["content"]
         except Exception as e:
             # Fallback Mechanism (The "Safety Net")
             print(f"[Ollama Error] Chat generation failed: {e}")
@@ -62,19 +63,19 @@ class OllamaProvider(AIProvider):
             response = ollama.chat(
                 model=self.model,
                 messages=[
-                    {'role': 'system', 'content': KEYWORD_SYSTEM_PROMPT},
-                    {'role': 'user', 'content': user_query},
+                    {"role": "system", "content": KEYWORD_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_query},
                 ],
-                options={'timeout': 15},  # Keyword extraction: tighter cap
+                options={"timeout": 15},  # Keyword extraction: tighter cap
             )
 
-            content = response['message']['content']
+            content = response["message"]["content"]
 
             # --- ROBUST PARSING STRATEGY ---
             # Llama 3 is chatty. We must perform "surgical extraction" of the JSON array.
             # We look for the first '[' and the last ']' to ignore any conversational filler.
-            start_idx = content.find('[')
-            end_idx = content.rfind(']') + 1
+            start_idx = content.find("[")
+            end_idx = content.rfind("]") + 1
 
             if start_idx != -1 and end_idx != -1:
                 clean_json = content[start_idx:end_idx]

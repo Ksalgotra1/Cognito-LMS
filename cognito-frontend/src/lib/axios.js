@@ -50,7 +50,7 @@ client.interceptors.response.use(
 
                 // Retry the original request with new token
                 return client(originalRequest);
-            } catch (refreshError) {
+            } catch (_refreshError) {
                 console.warn("🔒 Token refresh failed. Redirecting to login...");
                 toastEvents.emit('Session expired. Please log in again.', 'error');
 

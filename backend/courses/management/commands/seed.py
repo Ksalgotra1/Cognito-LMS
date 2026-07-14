@@ -14,37 +14,46 @@ Creates:
 """
 
 import random
-from django.core.management.base import BaseCommand
+
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+
 from courses.models import (
-    Course, Module, Lesson, Question, Choice,
-    Enrollment, UserProgress, Certificate, UserProfile,
+    Certificate,
+    Choice,
+    Course,
+    Enrollment,
+    Lesson,
+    Module,
+    Question,
+    UserProfile,
+    UserProgress,
 )
 
 User = get_user_model()
 
 # ── Real YouTube video IDs for lessons ──────────────────────────────────
 YOUTUBE_VIDEOS = [
-    "https://www.youtube.com/watch?v=rfscVS0vtbw",   # Python for Beginners
-    "https://www.youtube.com/watch?v=PkZNo7MFNFg",   # JavaScript Tutorial
-    "https://www.youtube.com/watch?v=w7ejDZ8SWv8",   # React JS Crash Course
-    "https://www.youtube.com/watch?v=HXV3zeQKqGY",   # CSS Crash Course
-    "https://www.youtube.com/watch?v=pTFZrS5XjTg",   # Node.js Tutorial
-    "https://www.youtube.com/watch?v=0sOvCWFmrtA",   # TypeScript
-    "https://www.youtube.com/watch?v=qz0aGYrrlhU",   # SQL Tutorial
-    "https://www.youtube.com/watch?v=8jLOx1hD3_o",   # C++ Tutorial
-    "https://www.youtube.com/watch?v=grEKMHGYyns",   # Java for Beginners
-    "https://www.youtube.com/watch?v=ua-CiDNNj30",   # Django REST Framework
-    "https://www.youtube.com/watch?v=7S_tz1z_5bA",   # MySQL
-    "https://www.youtube.com/watch?v=_uQrJ0TkZlc",   # Python OOP
-    "https://www.youtube.com/watch?v=Oe421EPjeBE",   # Git and GitHub
-    "https://www.youtube.com/watch?v=fBNz5xF-Kx4",   # Node Express
-    "https://www.youtube.com/watch?v=4deVCNJq3qc",   # Vue JS Crash Course
-    "https://www.youtube.com/watch?v=9zUHg7xjIqQ",   # AWS Basics
-    "https://www.youtube.com/watch?v=3c-iBn73dDE",   # Docker Tutorial
-    "https://www.youtube.com/watch?v=X48VuDVv0do",   # Kubernetes
-    "https://www.youtube.com/watch?v=pEfrdAtAmqk",   # MongoDB
-    "https://www.youtube.com/watch?v=RGOj5yH7evk",   # Git Tutorial
+    "https://www.youtube.com/watch?v=rfscVS0vtbw",  # Python for Beginners
+    "https://www.youtube.com/watch?v=PkZNo7MFNFg",  # JavaScript Tutorial
+    "https://www.youtube.com/watch?v=w7ejDZ8SWv8",  # React JS Crash Course
+    "https://www.youtube.com/watch?v=HXV3zeQKqGY",  # CSS Crash Course
+    "https://www.youtube.com/watch?v=pTFZrS5XjTg",  # Node.js Tutorial
+    "https://www.youtube.com/watch?v=0sOvCWFmrtA",  # TypeScript
+    "https://www.youtube.com/watch?v=qz0aGYrrlhU",  # SQL Tutorial
+    "https://www.youtube.com/watch?v=8jLOx1hD3_o",  # C++ Tutorial
+    "https://www.youtube.com/watch?v=grEKMHGYyns",  # Java for Beginners
+    "https://www.youtube.com/watch?v=ua-CiDNNj30",  # Django REST Framework
+    "https://www.youtube.com/watch?v=7S_tz1z_5bA",  # MySQL
+    "https://www.youtube.com/watch?v=_uQrJ0TkZlc",  # Python OOP
+    "https://www.youtube.com/watch?v=Oe421EPjeBE",  # Git and GitHub
+    "https://www.youtube.com/watch?v=fBNz5xF-Kx4",  # Node Express
+    "https://www.youtube.com/watch?v=4deVCNJq3qc",  # Vue JS Crash Course
+    "https://www.youtube.com/watch?v=9zUHg7xjIqQ",  # AWS Basics
+    "https://www.youtube.com/watch?v=3c-iBn73dDE",  # Docker Tutorial
+    "https://www.youtube.com/watch?v=X48VuDVv0do",  # Kubernetes
+    "https://www.youtube.com/watch?v=pEfrdAtAmqk",  # MongoDB
+    "https://www.youtube.com/watch?v=RGOj5yH7evk",  # Git Tutorial
 ]
 
 # ── Course categories with realistic titles ─────────────────────────────
@@ -195,7 +204,11 @@ LESSON_TEMPLATES = [
 # ── Quiz question bank per category ──────────────────────────────────────
 QUIZ_BANK = {
     "Python": [
-        ("What is the output of `print(type([]))`?", ["<class 'list'>", "<class 'tuple'>", "<class 'dict'>", "<class 'set'>"], 0),
+        (
+            "What is the output of `print(type([]))`?",
+            ["<class 'list'>", "<class 'tuple'>", "<class 'dict'>", "<class 'set'>"],
+            0,
+        ),
         ("Which keyword defines a function in Python?", ["func", "def", "function", "lambda"], 1),
         ("What does `len('hello')` return?", ["4", "5", "6", "Error"], 1),
     ],
@@ -205,7 +218,11 @@ QUIZ_BANK = {
         ("What does `===` check?", ["Value only", "Type only", "Value and type", "Reference"], 2),
     ],
     "Web Development": [
-        ("What does CSS stand for?", ["Creative Style Sheets", "Cascading Style Sheets", "Computer Style Sheets", "Colorful Style Sheets"], 1),
+        (
+            "What does CSS stand for?",
+            ["Creative Style Sheets", "Cascading Style Sheets", "Computer Style Sheets", "Colorful Style Sheets"],
+            1,
+        ),
         ("Which HTML tag is used for the largest heading?", ["<h6>", "<heading>", "<h1>", "<head>"], 2),
         ("What is the default display of a `<div>`?", ["inline", "block", "flex", "grid"], 1),
     ],
@@ -215,9 +232,17 @@ QUIZ_BANK = {
         ("Which method triggers a re-render?", ["forceUpdate()", "setState()", "render()", "Both A and B"], 3),
     ],
     "Django": [
-        ("What is Django's ORM?", ["Object Relational Mapping", "Object Remote Method", "Online Resource Manager", "Output Rendering Module"], 0),
+        (
+            "What is Django's ORM?",
+            ["Object Relational Mapping", "Object Remote Method", "Online Resource Manager", "Output Rendering Module"],
+            0,
+        ),
         ("Which file defines URL patterns?", ["views.py", "models.py", "urls.py", "settings.py"], 2),
-        ("What does `migrate` command do?", ["Creates models", "Applies database changes", "Starts server", "Runs tests"], 1),
+        (
+            "What does `migrate` command do?",
+            ["Creates models", "Applies database changes", "Starts server", "Runs tests"],
+            1,
+        ),
     ],
     "Data Science": [
         ("Which library is used for DataFrames?", ["NumPy", "Pandas", "Matplotlib", "Scikit-learn"], 1),
@@ -225,23 +250,70 @@ QUIZ_BANK = {
         ("Which plot type shows distribution?", ["Bar chart", "Histogram", "Pie chart", "Line chart"], 1),
     ],
     "DevOps": [
-        ("What does CI/CD stand for?", ["Code Integration/Code Delivery", "Continuous Integration/Continuous Delivery", "Complete Integration/Complete Deployment", "Cloud Integration/Cloud Delivery"], 1),
+        (
+            "What does CI/CD stand for?",
+            [
+                "Code Integration/Code Delivery",
+                "Continuous Integration/Continuous Delivery",
+                "Complete Integration/Complete Deployment",
+                "Cloud Integration/Cloud Delivery",
+            ],
+            1,
+        ),
         ("Which command lists Docker containers?", ["docker list", "docker ps", "docker show", "docker containers"], 1),
         ("What is a Dockerfile?", ["A log file", "A blueprint for images", "A container dump", "A network config"], 1),
     ],
     "Databases": [
-        ("What does SQL stand for?", ["Structured Query Language", "Simple Query Logic", "Standard Query Library", "Sequential Query Loader"], 0),
+        (
+            "What does SQL stand for?",
+            ["Structured Query Language", "Simple Query Logic", "Standard Query Library", "Sequential Query Loader"],
+            0,
+        ),
         ("Which key uniquely identifies a row?", ["Foreign Key", "Primary Key", "Candidate Key", "Composite Key"], 1),
-        ("What is normalization?", ["Adding redundancy", "Removing redundancy", "Adding indexes", "Removing indexes"], 1),
+        (
+            "What is normalization?",
+            ["Adding redundancy", "Removing redundancy", "Adding indexes", "Removing indexes"],
+            1,
+        ),
     ],
     "System Design": [
-        ("What is horizontal scaling?", ["Adding more RAM", "Adding more servers", "Adding more CPU", "Adding more storage"], 1),
-        ("What does CAP theorem state?", ["Choose 2 of 3: Consistency, Availability, Partition Tolerance", "Choose all 3 always", "Ignore consistency", "CAP is outdated"], 0),
-        ("What is a load balancer?", ["Database optimizer", "Traffic distributor", "Cache invalidator", "Message broker"], 1),
+        (
+            "What is horizontal scaling?",
+            ["Adding more RAM", "Adding more servers", "Adding more CPU", "Adding more storage"],
+            1,
+        ),
+        (
+            "What does CAP theorem state?",
+            [
+                "Choose 2 of 3: Consistency, Availability, Partition Tolerance",
+                "Choose all 3 always",
+                "Ignore consistency",
+                "CAP is outdated",
+            ],
+            0,
+        ),
+        (
+            "What is a load balancer?",
+            ["Database optimizer", "Traffic distributor", "Cache invalidator", "Message broker"],
+            1,
+        ),
     ],
     "Security": [
-        ("What does XSS stand for?", ["Cross-Site Scripting", "Cross-Server Security", "XML Security Standard", "Extra Secure Socket"], 0),
-        ("What is CSRF?", ["Cross-Site Request Forgery", "Client-Side Rendering Framework", "Cached Server Response Format", "Cross-System Resource Fetch"], 0),
+        (
+            "What does XSS stand for?",
+            ["Cross-Site Scripting", "Cross-Server Security", "XML Security Standard", "Extra Secure Socket"],
+            0,
+        ),
+        (
+            "What is CSRF?",
+            [
+                "Cross-Site Request Forgery",
+                "Client-Side Rendering Framework",
+                "Cached Server Response Format",
+                "Cross-System Resource Fetch",
+            ],
+            0,
+        ),
         ("What does HTTPS add over HTTP?", ["Speed", "Encryption (TLS/SSL)", "Compression", "Caching"], 1),
     ],
 }
@@ -271,11 +343,46 @@ THUMBNAILS = [
 
 # ── Users ────────────────────────────────────────────────────────────────
 USERS = [
-    {"username": "test123",     "email": "test123@cognito.dev",     "password": "test123",     "first_name": "Test",     "last_name": "User",     "role": "STUDENT"},
-    {"username": "alice_dev",   "email": "alice@cognito.dev",       "password": "alice123",    "first_name": "Alice",    "last_name": "Johnson",  "role": "STUDENT"},
-    {"username": "bob_coder",   "email": "bob@cognito.dev",         "password": "bob123",      "first_name": "Bob",      "last_name": "Smith",    "role": "STUDENT"},
-    {"username": "charlie_ml",  "email": "charlie@cognito.dev",     "password": "charlie123",  "first_name": "Charlie",  "last_name": "Brown",    "role": "STUDENT"},
-    {"username": "dana_sec",    "email": "dana@cognito.dev",        "password": "dana123",     "first_name": "Dana",     "last_name": "Williams", "role": "STUDENT"},
+    {
+        "username": "test123",
+        "email": "test123@cognito.dev",
+        "password": "test123",
+        "first_name": "Test",
+        "last_name": "User",
+        "role": "STUDENT",
+    },
+    {
+        "username": "alice_dev",
+        "email": "alice@cognito.dev",
+        "password": "alice123",
+        "first_name": "Alice",
+        "last_name": "Johnson",
+        "role": "STUDENT",
+    },
+    {
+        "username": "bob_coder",
+        "email": "bob@cognito.dev",
+        "password": "bob123",
+        "first_name": "Bob",
+        "last_name": "Smith",
+        "role": "STUDENT",
+    },
+    {
+        "username": "charlie_ml",
+        "email": "charlie@cognito.dev",
+        "password": "charlie123",
+        "first_name": "Charlie",
+        "last_name": "Brown",
+        "role": "STUDENT",
+    },
+    {
+        "username": "dana_sec",
+        "email": "dana@cognito.dev",
+        "password": "dana123",
+        "first_name": "Dana",
+        "last_name": "Williams",
+        "role": "STUDENT",
+    },
 ]
 
 # ── Enrollment counts per user ───────────────────────────────────────────
@@ -315,14 +422,13 @@ class Command(BaseCommand):
                     "first_name": u["first_name"],
                     "last_name": u["last_name"],
                     "role": u["role"],
-                }
+                },
             )
             if created:
                 user.set_password(u["password"])
                 user.save()
                 UserProfile.objects.get_or_create(
-                    user=user,
-                    defaults={"bio": f"Hi, I'm {u['first_name']}! Learning to code on Cognito LMS."}
+                    user=user, defaults={"bio": f"Hi, I'm {u['first_name']}! Learning to code on Cognito LMS."}
                 )
             users.append(user)
             status = "✅ created" if created else "⏭  exists"
@@ -336,14 +442,13 @@ class Command(BaseCommand):
                 "first_name": "Professor",
                 "last_name": "Cognito",
                 "role": "INSTRUCTOR",
-            }
+            },
         )
         if created:
             instructor.set_password("instructor123")
             instructor.save()
             UserProfile.objects.get_or_create(
-                user=instructor,
-                defaults={"bio": "Lead instructor at Cognito LMS. 10+ years in software engineering."}
+                user=instructor, defaults={"bio": "Lead instructor at Cognito LMS. 10+ years in software engineering."}
             )
         self.stdout.write(f"   {'✅ created' if created else '⏭  exists'}: prof_cognito (instructor)\n")
 
@@ -360,7 +465,7 @@ class Command(BaseCommand):
                         "description": random.choice(DESCRIPTION_TEMPLATES).format(topic=title),
                         "instructor": instructor,
                         "thumbnail_url": random.choice(THUMBNAILS),
-                    }
+                    },
                 )
                 all_courses.append(course)
 
@@ -499,7 +604,7 @@ class Command(BaseCommand):
                         defaults={
                             "is_completed": True,
                             "is_quiz_passed": random.random() > 0.15,  # 85% pass rate
-                        }
+                        },
                     )
 
             self.stdout.write(f"   {user.username}: progress generated")
@@ -548,5 +653,5 @@ class Command(BaseCommand):
         self.stdout.write(f"   Progress:    {UserProgress.objects.count()}")
         self.stdout.write(f"   Certificates:{Certificate.objects.count()}")
         self.stdout.write("")
-        self.stdout.write(f"   🔑 Primary login: test123 / test123")
+        self.stdout.write("   🔑 Primary login: test123 / test123")
         self.stdout.write("")
