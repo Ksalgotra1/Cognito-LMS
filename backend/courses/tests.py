@@ -409,3 +409,144 @@ class LessonCompletionTest(BaseTestMixin, TestCase):
         # Toggle back
         response = self.client.post(f'/api/courses/lessons/{self.lesson.id}/complete/')
         self.assertFalse(response.data['is_completed'])
+
+
+# ============================================================
+#  4. SECURITY HARDENING TESTS  (SA-6)
+# ============================================================
+
+class CourseOwnershipSecurityTest(BaseTestMixin, TestCase):
+    """
+    Tests that only the course instructor can update/delete courses.
+    Validates the perform_update / perform_destroy ownership guards added in SA-1.1.
+    """
+
+    def test_non_owner_cannot_update_course(self):
+        """A student cannot PUT a course they don't own — must get 403."""
+        self.client.force_authenticate(user=self.student)
+        response = self.client.put(
+            f'/api/courses/{self.course.id}/',
+            {'title': 'Hacked Title', 'description': 'Hacked'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_non_owner_cannot_patch_course(self):
+        """A student cannot PATCH a course they don't own — must get 403."""
+        self.client.force_authenticate(user=self.student)
+        response = self.client.patch(
+            f'/api/courses/{self.course.id}/',
+            {'title': 'Sneaky Patch'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_non_owner_cannot_delete_course(self):
+        """A student cannot DELETE a course they don't own — must get 403."""
+        self.client.force_authenticate(user=self.student)
+        response = self.client.delete(f'/api/courses/{self.course.id}/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Course.objects.filter(id=self.course.id).exists())
+
+    def test_owner_can_update_course(self):
+        """The owning instructor CAN update their own course."""
+        self.client.force_authenticate(user=self.instructor)
+        response = self.client.patch(
+            f'/api/courses/{self.course.id}/',
+            {'title': 'Updated by Owner'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.title, 'Updated by Owner')
+
+    def test_owner_can_delete_course(self):
+        """The owning instructor CAN delete their own course."""
+        self.client.force_authenticate(user=self.instructor)
+        response = self.client.delete(f'/api/courses/{self.course.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Course.objects.filter(id=self.course.id).exists())
+
+
+class RegistrationRoleSecurityTest(TestCase):
+    """
+    Tests that users cannot self-assign elevated roles during registration.
+    Validates the SA-1.2 fix that removed 'role' from writable serializer fields.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_cannot_register_as_admin(self):
+        """Sending role=ADMIN in registration body is silently ignored; user is STUDENT."""
+        response = self.client.post('/api/register/', {
+            'username': 'hacker_admin',
+            'email': 'hacker@test.com',
+            'password': 'hackpass123',
+            'role': 'ADMIN'
+        }, format='json')
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        user = User.objects.get(username='hacker_admin')
+        self.assertEqual(user.role, User.Role.STUDENT)
+        self.assertFalse(user.is_superuser)
+
+    def test_cannot_register_as_instructor(self):
+        """Sending role=INSTRUCTOR in registration body is silently ignored; user is STUDENT."""
+        response = self.client.post('/api/register/', {
+            'username': 'fake_instructor',
+            'email': 'fake@test.com',
+            'password': 'hackpass123',
+            'role': 'INSTRUCTOR'
+        }, format='json')
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        user = User.objects.get(username='fake_instructor')
+        self.assertEqual(user.role, User.Role.STUDENT)
+
+    def test_normal_registration_defaults_to_student(self):
+        """Standard registration without role field creates a STUDENT."""
+        response = self.client.post('/api/register/', {
+            'username': 'normal_user',
+            'email': 'normal@test.com',
+            'password': 'normalpass123',
+        }, format='json')
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        user = User.objects.get(username='normal_user')
+        self.assertEqual(user.role, User.Role.STUDENT)
+
+
+class GenerateStudyPlanPermissionTest(BaseTestMixin, TestCase):
+    """
+    Tests that GenerateStudyPlanView now requires authentication (SA-3.2).
+    Before the fix the view had no permission_classes and defaulted to AllowAny.
+    """
+
+    def test_unauthenticated_user_rejected(self):
+        """Anonymous POST to generate-plan must return 401 after SA-3.2 fix."""
+        # No force_authenticate — client is anonymous
+        response = self.client.post(
+            f'/api/courses/{self.course.id}/generate-plan/',
+            {
+                'target_date': '2025-12-31',
+                'availability': {'Mon': 60, 'Tue': 60, 'Wed': 60,
+                                 'Thu': 60, 'Fri': 60, 'Sat': 0, 'Sun': 0}
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_authenticated_user_can_access(self):
+        """An authenticated student CAN call the study plan endpoint."""
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            f'/api/courses/{self.course.id}/generate-plan/',
+            {
+                'target_date': '2025-12-31',
+                'availability': {'Mon': 60, 'Tue': 60, 'Wed': 60,
+                                 'Thu': 60, 'Fri': 60, 'Sat': 0, 'Sun': 0}
+            },
+            format='json'
+        )
+        # 200/400 both mean auth worked; 401/403 means it didn't
+        self.assertNotIn(response.status_code,
+                         [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+

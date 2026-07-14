@@ -1,4 +1,4 @@
-import pickle
+import json
 from django.core.cache import cache
 from .models import Course, UserProgress
 
@@ -20,8 +20,8 @@ def get_rag_context(course_id, user):
     try:
         cached_blob = cache.get(cache_key)
         if cached_blob:
-            # We use Pickle because your DAG is a complex Dictionary, not a string
-            context_data = pickle.loads(cached_blob)
+            # json is safe for simple dict[str, str|list[str]] — no need for pickle
+            context_data = json.loads(cached_blob)
             print(f"⚡️ [Redis Hit] Loaded DAG for Course {course_id} from RAM.")  # <--- LOG HIT
     except Exception:
         pass # If Redis hiccups, we simply fall back to DB
@@ -52,7 +52,7 @@ def get_rag_context(course_id, user):
             # 4. Save to Redis (Transient Cache)
             # We use a 1-hour TTL (3600s) as a safety net so memory auto-cleans
             try:
-                cache.set(cache_key, pickle.dumps(context_data), timeout=3600)
+                cache.set(cache_key, json.dumps(context_data), timeout=3600)
                 print(f"✅ [Redis Write] Cached DAG for Course {course_id} (TTL: 1h)") # <--- LOG WRITE
             except Exception as e:
                 print(f"❌ [Redis Error] Could not write to cache: {e}")
