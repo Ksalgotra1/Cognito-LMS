@@ -22,6 +22,16 @@ export const fetchCourseById = async (id) => {
 export const askAiTutor = async (courseId, question, onProgress) => {
   // 1. Start the task
   const initRes = await client.post(`api/courses/${courseId}/ask/`, { question });
+
+  // Production (sync): backend returns the answer directly
+  if (initRes.data.status === 'completed') {
+    return { answer: initRes.data.answer };
+  }
+  if (initRes.data.status === 'failed') {
+    throw new Error(initRes.data.error || 'AI request failed');
+  }
+
+  // Development (async): backend returns a task_id for polling
   const taskId = initRes.data.task_id;
 
   if (onProgress) onProgress('AI is thinking...');
