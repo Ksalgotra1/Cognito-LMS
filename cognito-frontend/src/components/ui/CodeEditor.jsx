@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, RotateCcw, Terminal, Loader2 } from 'lucide-react';
 
