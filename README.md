@@ -12,6 +12,15 @@
 | AI Tutor | RAG pipeline via Celery + Redis, course-context aware |
 | Certificates | UUID v4, QR code, publicly verifiable without login |
 
+### 🌐 Live Demo
+
+| | URL |
+|---|---|
+| **Frontend** | [cognito-lms.vercel.app](https://cognito-lms.vercel.app) |
+| **Backend API** | [cognito-lms-arku.onrender.com/api/courses/](https://cognito-lms-arku.onrender.com/api/courses/) |
+
+> **Note:** The backend runs on Render's free tier and may take ~30s to wake up on first request after inactivity.
+
 ---
 
 ## ■ Table of Contents
@@ -103,7 +112,7 @@ The platform handles the complete learning lifecycle: course discovery in a mark
 | **Caching** | Redis via django-redis |
 | **Async** | Celery 5 with Redis broker |
 | **AI/LLM** | Modular provider: Ollama (Llama 3, local) or OpenAI (cloud) — env-switchable |
-| **Code Execution** | Piston API (sandboxed, proxied through backend) |
+| **Code Execution** | Pyodide (Python via WebAssembly, runs in browser) |
 | **Visualization** | React Flow (DAG), Monaco Editor (code lab), Recharts (analytics) |
 | **Documents** | ReportLab (PDF certificates), qrcode (QR generation) |
 
@@ -474,7 +483,7 @@ flowchart LR
     subgraph Learn ["4. Learning"]
         Unlock --> Video["Watch video lessons"]
         Video --> Toggle["Toggle completion<br/>(optimistic update)"]
-        Toggle --> CodeLab["Code Lab:<br/>Monaco + Piston"]
+        Toggle --> CodeLab["Code Lab:<br/>Monaco + Pyodide"]
         Toggle --> AI["AI Tutor:<br/>RAG + Celery polling"]
     end
 
@@ -524,7 +533,7 @@ From the course detail page, the student opens the "Coding Lab and AI" tab. The 
 
 ### 7. Code Lab
 
-The integrated Monaco Editor provides a VS Code-like environment. Code execution routes through the backend proxy to the Piston API, with rate limiting and 30-second timeout protection. Output appears in a terminal panel below the editor.
+The integrated Monaco Editor provides a VS Code-like environment. Code execution uses Pyodide (Python compiled to WebAssembly), running entirely in the browser with zero backend dependency. The WASM runtime is lazy-loaded on first use (~10MB, cached by the browser) and provides instant execution thereafter. Output appears in a terminal panel below the editor.
 
 ### 8. Certificate Generation
 
@@ -593,7 +602,7 @@ src/
   |
   components/ui/
     Button.jsx               -- Reusable styled button
-    CodeEditor.jsx           -- Monaco Editor + Piston proxy
+    CodeEditor.jsx           -- Monaco Editor + Pyodide (WASM)
     SearchBar.jsx            -- Hybrid search (Trie + AI, debounced)
     Skeleton.jsx             -- Base skeleton primitives
     Skeletons.jsx            -- Page-specific skeleton compositions
