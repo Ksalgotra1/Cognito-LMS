@@ -1,6 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles, Copy, Check } from 'lucide-react'; // <--- Added Copy, Check
+import { Send, Bot, User, Loader2, Sparkles, Copy, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { askAiTutor } from '../api/coursesApi';
+
+// Reusable code block with language header + copy button (ChatGPT-style)
+const CodeBlock = ({ lang, code }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-2 rounded-lg overflow-hidden border border-gray-700">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#2d2d2d] text-gray-400 text-[11px] font-mono">
+        <span>{lang || 'code'}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 hover:text-white transition-colors"
+        >
+          {copied ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
+        </button>
+      </div>
+      {/* Code body */}
+      <pre className="bg-[#1e1e1e] text-gray-100 p-3 overflow-x-auto text-xs leading-relaxed">
+        <code className="font-mono">{code}</code>
+      </pre>
+    </div>
+  );
+};
 
 const AiTutor = ({ courseId }) => {
   const [input, setInput] = useState('');
@@ -79,12 +110,49 @@ const AiTutor = ({ courseId }) => {
             <div className={`relative max-w-[80%] ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
                 
                 {/* The Bubble */}
-                <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                <div className={`p-3 rounded-2xl text-sm leading-relaxed ${
                   msg.sender === 'user' 
                     ? 'bg-indigo-600 text-white rounded-tr-none' 
                     : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'
                 } ${msg.isError ? 'bg-red-50 text-red-600 border-red-200' : ''}`}>
-                  {msg.text}
+                  {msg.sender === 'ai' && !msg.isError ? (
+                    <ReactMarkdown
+                      components={{
+                        code({ inline, className, children, ...props }) {
+                          const lang = className?.replace('language-', '') || '';
+                          const codeText = String(children).replace(/\n$/, '');
+
+                          if (inline) {
+                            return (
+                              <code className="bg-gray-100 text-indigo-700 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                            );
+                          }
+
+                          return <CodeBlock lang={lang} code={codeText} />;
+                        },
+                        pre({ children }) {
+                          // Let the code component handle everything
+                          return <>{children}</>;
+                        },
+                        p({ children }) {
+                          return <p className="mb-2 last:mb-0">{children}</p>;
+                        },
+                        ul({ children }) {
+                          return <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>;
+                        },
+                        ol({ children }) {
+                          return <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>;
+                        },
+                        strong({ children }) {
+                          return <strong className="font-bold text-gray-900">{children}</strong>;
+                        },
+                      }}
+                    >
+                      {msg.text}
+                    </ReactMarkdown>
+                  ) : (
+                    msg.text
+                  )}
                 </div>
 
                 {/*  Copy Button (Only for AI messages) */}
