@@ -697,20 +697,34 @@ class AskAIView(APIView):
         if any(pattern in question_lower for pattern in suspicious_patterns):
             return Response({"error": "Invalid prompt content detected"}, status=400)
 
-        # FIRE AND (almost) FORGET
-        # Start the Celery task and return immediately
-        from .tasks import generate_ai_response_task
+        # Try async (Celery) first; fall back to sync if no worker is available.
+        # This lets the AI tutor work on Render free tier (no background workers).
+        try:
+            from .tasks import generate_ai_response_task
 
-        task = generate_ai_response_task.delay(course_id, request.user.id, user_question)
+            task = generate_ai_response_task.delay(course_id, request.user.id, user_question)
 
-        # Security: Store task ownership so get_ai_task_status can scope it
-        from django.core.cache import cache as task_cache
+            # Security: Store task ownership so get_ai_task_status can scope it
+            from django.core.cache import cache as task_cache
 
-        task_cache.set(f"task_owner_{task.id}", request.user.id, timeout=3600)
+            task_cache.set(f"task_owner_{task.id}", request.user.id, timeout=3600)
 
-        return Response(
-            {"task_id": task.id, "status": "processing", "message": "AI is thinking..."}, status=202
-        )  # 202 Accepted
+            return Response(
+                {"task_id": task.id, "status": "processing", "message": "AI is thinking..."}, status=202
+            )  # 202 Accepted
+
+        except Exception:
+            # Celery broker unavailable — run synchronously
+            from .ai_client import get_chat_response
+            from .services import get_rag_context
+
+            try:
+                system_prompt = get_rag_context(course_id, request.user)
+                safe_question = f"<user_input>\n{user_question}\n</user_input>"
+                ai_answer = get_chat_response(system_prompt, safe_question)
+                return Response({"status": "completed", "answer": ai_answer})
+            except Exception as e:
+                return Response({"status": "failed", "error": str(e)}, status=500)
 
 
 @api_view(["GET"])

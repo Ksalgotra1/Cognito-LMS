@@ -34,11 +34,19 @@ SECURE_HSTS_PRELOAD = True
 # Site URL (set via env in production)
 SITE_URL = get_env_variable("SITE_URL", default="https://example.com", required=False)
 
-# Static files — collectstatic writes here; Nginx serves from this directory
+# Static files — WhiteNoise serves them directly from Gunicorn (no Nginx needed)
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
-# HTTPS enforcement behind reverse proxy (Nginx terminates TLS, forwards X-Forwarded-Proto)
-SECURE_SSL_REDIRECT = True
+# TLS: Render terminates TLS at the edge and forwards X-Forwarded-Proto.
+# Do NOT set SECURE_SSL_REDIRECT=True — Render already redirects HTTP→HTTPS,
+# and Django doing it too causes an infinite redirect loop.
+SECURE_SSL_REDIRECT = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # CSRF trusted origins — required for Django admin login over HTTPS

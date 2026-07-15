@@ -137,12 +137,19 @@ SIMPLE_JWT = {
 }
 
 # Redis Cache — derived from REDIS_URL env var
-# REDIS_URL default is redis://localhost:6379/0 (broker); cache uses logical db /1
-_redis_base = REDIS_URL.rsplit("/", 1)[0]  # strip trailing db number
+# Local redis:// supports logical db numbers (/0, /1); Upstash rediss:// does not.
+if REDIS_URL.startswith("rediss://"):
+    # Upstash TLS — single logical database, use same URL for cache and broker
+    _cache_url = REDIS_URL
+else:
+    # Local Redis — broker on db0, cache on db1
+    _redis_base = REDIS_URL.rsplit("/", 1)[0]
+    _cache_url = f"{_redis_base}/1"
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"{_redis_base}/1",
+        "LOCATION": _cache_url,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
