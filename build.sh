@@ -13,7 +13,4 @@ python manage.py collectstatic --noinput
 echo "🗃️ Running database migrations..."
 python manage.py migrate --noinput
 
-echo "🌱 Seeding demo courses..."
-python manage.py seed_courses
-
 echo "✅ Build complete!"
