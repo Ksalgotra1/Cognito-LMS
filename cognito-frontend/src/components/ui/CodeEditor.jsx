@@ -1,7 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, RotateCcw, Terminal, Loader2 } from 'lucide-react';
-import client from '../../lib/axios';
+
+// Pyodide CDN URL — Python compiled to WebAssembly, runs entirely in the browser
+const PYODIDE_CDN = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+
+// Lazy-load Pyodide once and reuse it across runs
+let pyodideInstance = null;
+
+const loadPyodideRuntime = async (onProgress) => {
+  if (pyodideInstance) return pyodideInstance;
+
+  onProgress?.("Loading Python runtime...");
+
+  // Dynamically import the Pyodide loader from CDN
+  if (!window.loadPyodide) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `${PYODIDE_CDN}pyodide.js`;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  onProgress?.("Initializing Python...");
+  pyodideInstance = await window.loadPyodide({ indexURL: PYODIDE_CDN });
+  return pyodideInstance;
+};
 
 const CodeEditor = ({ 
   initialCode = "# Write your Python code here\nprint('Hello Cognito!')", 
@@ -11,40 +37,40 @@ const CodeEditor = ({
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
 
-  // Execute code via backend proxy (enables logging/rate limiting)
+  // Execute Python code directly in the browser via Pyodide (WebAssembly)
   const handleRun = async () => {
     setIsRunning(true);
-    setOutput(""); // Clear old output
+    setOutput("");
 
     try {
-      // 1. Send code to backend proxy (which forwards to Piston)
-      const response = await client.post('/api/courses/execute/', {
-        code: code,
-        language: language
-      });
+      const pyodide = await loadPyodideRuntime((msg) => setOutput(msg));
 
-      const data = response.data;
+      // Redirect stdout/stderr to capture print() output
+      pyodide.runPython(`
+import sys, io
+sys.stdout = io.StringIO()
+sys.stderr = io.StringIO()
+      `);
 
-      // 2. Display Output
-      if (data.run) {
-        // stdout = Print statements | stderr = Errors
-        // We handle both so the user sees errors if their code fails
-        const result = data.run.stdout || data.run.stderr || "Process finished with no output.";
-        setOutput(result);
-      } else if (data.error) {
-        setOutput(`Error: ${data.error}`);
-      } else {
-        setOutput("Error: Could not communicate with the execution engine.");
+      // Run the user's code
+      try {
+        pyodide.runPython(code);
+      } catch (pyErr) {
+        // Python runtime error (SyntaxError, NameError, etc.)
+        const stderr = pyodide.runPython("sys.stderr.getvalue()");
+        setOutput(stderr || String(pyErr));
+        return;
       }
+
+      // Capture output
+      const stdout = pyodide.runPython("sys.stdout.getvalue()");
+      const stderr = pyodide.runPython("sys.stderr.getvalue()");
+      
+      const result = stdout || stderr || "Process finished with no output.";
+      setOutput(result);
 
     } catch (error) {
-      if (error.response?.status === 429) {
-        setOutput("Rate limit exceeded. Please wait before running code again.");
-      } else if (error.response?.status === 408) {
-        setOutput("Execution timed out. Your code took too long to run.");
-      } else {
-        setOutput(`System Error: ${error.message}`);
-      }
+      setOutput(`Error: ${error.message}`);
     } finally {
       setIsRunning(false);
     }
